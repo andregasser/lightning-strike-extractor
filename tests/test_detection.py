@@ -6,7 +6,13 @@ import cv2
 import numpy as np
 
 from lightning_extractor.config import Config
-from lightning_extractor.detection import frame_channel_metrics, frame_geometry_score, percentile
+from lightning_extractor.detection import (
+    _apply_multiframe_support,
+    frame_channel_metrics,
+    frame_geometry_score,
+    percentile,
+)
+from lightning_extractor.models import CandidateFrame
 
 
 def textured_scene() -> np.ndarray:
@@ -20,6 +26,27 @@ def textured_scene() -> np.ndarray:
 
 
 class DetectionTests(unittest.TestCase):
+    def test_multiframe_support_rewards_repeated_channel_geometry(self) -> None:
+        config = Config()
+        candidates = [
+            CandidateFrame(0, "event", 1, 0.00, 100.0, 1, 10.0, frame_quality=100.0),
+            CandidateFrame(0, "event", 2, 0.02, 90.0, 1, 10.0, frame_quality=90.0),
+            CandidateFrame(0, "event", 3, 0.20, 150.0, 1, 10.0, frame_quality=150.0),
+        ]
+        repeated = np.zeros((100, 100), dtype=np.uint8)
+        cv2.line(repeated, (10, 90), (80, 10), 255, 2)
+        shifted = np.zeros_like(repeated)
+        cv2.line(shifted, (12, 90), (82, 10), 255, 2)
+        isolated = np.zeros_like(repeated)
+        cv2.line(isolated, (90, 90), (90, 10), 255, 2)
+
+        _apply_multiframe_support(candidates, [repeated, shifted, isolated], config)
+
+        self.assertGreater(candidates[0].multiframe_support, 0.9)
+        self.assertGreater(candidates[0].multiframe_quality, candidates[0].frame_quality)
+        self.assertEqual(candidates[2].multiframe_support, 0.0)
+        self.assertEqual(candidates[2].multiframe_quality, candidates[2].frame_quality)
+
     def test_percentile_interpolates(self) -> None:
         self.assertEqual(percentile([0.0, 10.0], 0.5), 5.0)
         self.assertEqual(percentile([], 0.5), 0.0)

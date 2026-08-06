@@ -140,10 +140,19 @@ def select_export_candidates(
                 >= best_geometry * config.export.minimum_winner_geometry_ratio
             ]
             selected.append(
-                max(plausible, key=lambda row: row.frame_quality or row.geometry_score)
+                max(
+                    plausible,
+                    key=lambda row: (
+                        row.frame_quality or row.geometry_score,
+                        row.multiframe_support,
+                        row.geometry_score,
+                    ),
+                )
             )
         selected.sort(
-            key=lambda row: row.frame_quality or row.geometry_score,
+            key=lambda row: row.multiframe_quality
+            or row.frame_quality
+            or row.geometry_score,
             reverse=True,
         )
         return selected[: config.export.top]

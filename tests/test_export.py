@@ -50,6 +50,30 @@ class ExportSelectionTests(unittest.TestCase):
 
         self.assertEqual([row.rank for row in selected], [2])
 
+    def test_strongest_frame_wins_despite_multiframe_bonus(self) -> None:
+        config = Config()
+        rows = [candidate(1, "event-a", 100.0), candidate(2, "event-a", 90.0)]
+        rows[0].frame_quality = 100.0
+        rows[0].multiframe_quality = 100.0
+        rows[1].frame_quality = 95.0
+        rows[1].multiframe_quality = 110.0
+
+        selected = select_export_candidates(rows, config)
+
+        self.assertEqual([row.rank for row in selected], [1])
+
+    def test_multiframe_support_breaks_equal_strength_tie(self) -> None:
+        config = Config()
+        rows = [candidate(1, "event-a", 100.0), candidate(2, "event-a", 90.0)]
+        rows[0].frame_quality = 100.0
+        rows[0].multiframe_support = 0.2
+        rows[1].frame_quality = 100.0
+        rows[1].multiframe_support = 0.9
+
+        selected = select_export_candidates(rows, config)
+
+        self.assertEqual([row.rank for row in selected], [2])
+
 
 if __name__ == "__main__":
     unittest.main()

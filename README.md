@@ -287,6 +287,11 @@ stabilization_max_translation_fraction = 0.08
 stabilization_max_rotation_degrees = 5.0
 stabilization_max_scale_change = 0.05
 stabilization_mask_aligned_edges = true
+multiframe_enabled = true
+multiframe_width = 640
+multiframe_window_seconds = 0.06
+multiframe_dilation_pixels = 3
+multiframe_bonus_weight = 0.25
 
 [export]
 top = 50
@@ -311,6 +316,15 @@ safety limits; too few matches, too few inliers, or an implausible transform
 causes a safe fallback to the unaligned comparison. Static-edge masking removes
 sub-pixel interpolation remnants after successful alignment. Stabilization is
 analysis-only: exported JPEGs always contain the original, unwarped video frame.
+
+Multi-frame support compares each detected channel mask with the masks from the
+immediately surrounding frames. Spatially recurring channel geometry receives
+a bounded event-ranking bonus, helping distinguish a real developing discharge
+from a one-frame artifact. Isolated channels are not penalized, so an extremely
+short lightning strike remains eligible. Within each event, single-frame
+quality remains the primary winner criterion; multi-frame support only resolves
+a tie. Compact masks limit memory use, and the selected export is the strongest
+original single frame rather than a synthetic frame stack.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event

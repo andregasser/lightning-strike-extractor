@@ -34,6 +34,8 @@ class CandidateFrame:
     branch_points: int = 0
     channel_thickness: float = 0.0
     frame_quality: float = 0.0
+    multiframe_support: float = 0.0
+    multiframe_quality: float = 0.0
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)

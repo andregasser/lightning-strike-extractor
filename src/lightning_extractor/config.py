@@ -35,6 +35,11 @@ class ChannelConfig:
     stabilization_max_rotation_degrees: float = 5.0
     stabilization_max_scale_change: float = 0.05
     stabilization_mask_aligned_edges: bool = True
+    multiframe_enabled: bool = True
+    multiframe_width: int = 640
+    multiframe_window_seconds: float = 0.06
+    multiframe_dilation_pixels: int = 3
+    multiframe_bonus_weight: float = 0.25
     ridge_threshold: int = 10
     bright_area_threshold: int = 20
     minimum_line_length: int = 12

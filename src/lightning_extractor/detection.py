@@ -27,6 +27,7 @@ class ChannelMetrics:
     branch_points: int
     channel_thickness: float
     frame_quality: float
+    channel_mask: np.ndarray | None = None
 
 
 @dataclass(slots=True)
@@ -295,6 +296,7 @@ def frame_channel_metrics(
         branches,
         thickness,
         frame_quality,
+        best_component,
     )
 
 
@@ -444,6 +446,46 @@ def _branch_point_count(skeleton: np.ndarray) -> int:
     return max(0, components - 1)
 
 
+def _apply_multiframe_support(
+    candidates: list[CandidateFrame],
+    channel_masks: list[np.ndarray],
+    config: Config,
+) -> None:
+    for candidate in candidates:
+        candidate.multiframe_support = 0.0
+        candidate.multiframe_quality = candidate.frame_quality
+    if not config.channel.multiframe_enabled or len(candidates) < 2:
+        return
+
+    radius = max(0, config.channel.multiframe_dilation_pixels)
+    kernel_size = radius * 2 + 1
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    dilated = [cv2.dilate(mask, kernel) for mask in channel_masks]
+    window = max(0.0, config.channel.multiframe_window_seconds)
+    for index, (candidate, mask) in enumerate(zip(candidates, channel_masks, strict=True)):
+        pixels = int(np.count_nonzero(mask))
+        if pixels == 0:
+            continue
+        support = 0.0
+        for neighbour_index, neighbour in enumerate(candidates):
+            if neighbour_index == index or abs(neighbour.time - candidate.time) > window:
+                continue
+            overlap = float(np.count_nonzero((mask > 0) & (dilated[neighbour_index] > 0)))
+            support = max(support, overlap / pixels)
+        candidate.multiframe_support = support
+        candidate.multiframe_quality = candidate.frame_quality * (
+            1.0 + config.channel.multiframe_bonus_weight * support
+        )
+
+
+def _compact_channel_mask(mask: np.ndarray, config: Config) -> np.ndarray:
+    width = min(config.channel.multiframe_width, mask.shape[1])
+    if width == mask.shape[1]:
+        return mask
+    height = max(1, round(mask.shape[0] * width / mask.shape[1]))
+    return cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
+
+
 def rank_event_frames(
     video: Path,
     fps: float,
@@ -471,6 +513,7 @@ def rank_event_frames(
             continue
         stabilization_reference = _prepare_stabilization_reference(background, config)
         local: list[CandidateFrame] = []
+        channel_masks: list[np.ndarray] = []
         for offset in range(1, count + 1):
             ok, current = capture.read()
             if not ok:
@@ -497,6 +540,15 @@ def rank_event_frames(
                     frame_quality=metrics.frame_quality,
                 )
             )
+            channel_masks.append(
+                _compact_channel_mask(
+                    metrics.channel_mask
+                    if metrics.channel_mask is not None
+                    else np.zeros_like(stabilization_reference.gray),
+                    config,
+                )
+            )
+        _apply_multiframe_support(local, channel_masks, config)
         if config.analysis.keep_frames_per_event <= 0:
             selected = local
         else:
@@ -512,7 +564,10 @@ def rank_event_frames(
         if progress is not None:
             progress(event_index, len(events))
     capture.release()
-    candidates.sort(key=lambda item: item.frame_quality, reverse=True)
+    candidates.sort(
+        key=lambda item: item.multiframe_quality or item.frame_quality,
+        reverse=True,
+    )
     for rank, candidate in enumerate(candidates, 1):
         candidate.rank = rank
     return candidates
