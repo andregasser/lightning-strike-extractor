@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .analysis_deps/
+.private/
 
 # Large source media and generated artifacts
 data/inbox/*
@@ -16,4 +17,3 @@ previews/
 *.mkv
 *.avi
 *.m4v
-

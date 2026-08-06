@@ -303,11 +303,9 @@ conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 ## Roadmap
 
-- Generate highlight clips and reels from accepted events
-- Add an interactive local review interface
-- Build labeled fixtures for precision/recall evaluation
-- Reduce random seeks when ranking HEVC footage
-- Explore optional GPU and ML-assisted classification
+The public, continuously maintained roadmap lives in [`TODO.md`](TODO.md).
+Current priorities are full-length validation on real footage, an interactive
+review workflow, and exports for accepted stills and clips.
 
 ## Contributing
 
