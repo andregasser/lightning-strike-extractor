@@ -14,7 +14,7 @@ import numpy as np
 
 from . import __version__
 from .config import Config
-from .detection import detect_flashes, rank_event_frames
+from .detection import detect_flashes, frame_channel_metrics, rank_event_frames
 from .models import CandidateFrame, FlashEvent
 from .probe import probe_video
 from .progress import ProgressReporter
@@ -130,12 +130,18 @@ def select_export_candidates(
             events.setdefault(candidate.event_id, []).append(candidate)
         selected = []
         for rows in events.values():
-            best_geometry = max(row.geometry_score for row in rows)
-            if best_geometry < config.export.minimum_geometry_score:
-                continue
-            plausible = [
+            qualified = [
                 row
                 for row in rows
+                if row.geometry_score >= config.export.minimum_geometry_score
+                and row.channel_length >= config.export.minimum_channel_length
+            ]
+            if not qualified:
+                continue
+            best_geometry = max(row.geometry_score for row in qualified)
+            plausible = [
+                row
+                for row in qualified
                 if row.geometry_score
                 >= best_geometry * config.export.minimum_winner_geometry_ratio
             ]
@@ -159,7 +165,10 @@ def select_export_candidates(
 
     selected: list[CandidateFrame] = []
     for candidate in candidates:
-        if candidate.geometry_score < config.export.minimum_geometry_score:
+        if (
+            candidate.geometry_score < config.export.minimum_geometry_score
+            or candidate.channel_length < config.export.minimum_channel_length
+        ):
             continue
         selected.append(candidate)
         if len(selected) >= config.export.top:
@@ -167,21 +176,37 @@ def select_export_candidates(
     return selected
 
 
-def _contact_thumbnail(frame: np.ndarray, label: str, peak: bool = False) -> np.ndarray:
+def _contact_thumbnail(
+    frame: np.ndarray,
+    label: str,
+    details: str = "",
+    peak: bool = False,
+) -> np.ndarray:
     width = 640
     height = round(frame.shape[0] * width / frame.shape[1])
     thumbnail = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
-    cv2.rectangle(thumbnail, (0, 0), (width, 38), (0, 0, 0), -1)
+    cv2.rectangle(thumbnail, (0, 0), (width, 62), (0, 0, 0), -1)
     cv2.putText(
         thumbnail,
         label,
         (8, 27),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
+        0.62,
         (255, 255, 255),
         2,
         cv2.LINE_AA,
     )
+    if details:
+        cv2.putText(
+            thumbnail,
+            details,
+            (8, 52),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.46,
+            (220, 220, 220),
+            1,
+            cv2.LINE_AA,
+        )
     if peak:
         cv2.rectangle(
             thumbnail,
@@ -193,12 +218,31 @@ def _contact_thumbnail(frame: np.ndarray, label: str, peak: bool = False) -> np.
     return thumbnail
 
 
+def _channel_overlay(frame: np.ndarray, channel_mask: np.ndarray | None) -> np.ndarray:
+    overlay = frame.copy()
+    if channel_mask is None or not np.any(channel_mask):
+        return overlay
+    mask = cv2.resize(
+        channel_mask,
+        (frame.shape[1], frame.shape[0]),
+        interpolation=cv2.INTER_NEAREST,
+    )
+    selected = mask > 0
+    colour = np.zeros_like(frame)
+    colour[:, :] = (255, 0, 255)
+    overlay[selected] = cv2.addWeighted(frame, 0.25, colour, 0.75, 0)[selected]
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(overlay, contours, -1, (0, 255, 255), 2)
+    return overlay
+
+
 def _append_contact_sequence(
     capture: cv2.VideoCapture,
     frame: np.ndarray,
     candidate: CandidateFrame,
     config: Config,
     thumbnails: list[np.ndarray],
+    overlay: np.ndarray | None = None,
 ) -> None:
     context = max(0, config.export.contact_sheet_context_frames)
     stride = max(1, config.export.contact_sheet_context_stride)
@@ -219,11 +263,28 @@ def _append_contact_sequence(
         if context_frame is None:
             context_frame = np.zeros_like(frame)
         if relative == 0:
-            label = f"PEAK #{candidate.rank}  {candidate.time:.3f}s"
+            label = f"PEAK #{candidate.rank}  {candidate.event_id}  {candidate.time:.3f}s"
+            details = (
+                f"Q {candidate.frame_quality:.0f}  G {candidate.geometry_score:.0f}  "
+                f"L {candidate.channel_length:.0f}  S {candidate.channel_strength:.1f}  "
+                f"B {candidate.branch_points}  MF {candidate.multiframe_support:.2f}"
+            )
         else:
             time = candidate.time + relative * stride / fps if fps > 0 else candidate.time
             label = f"{relative * stride:+d}f  {time:.3f}s"
-        thumbnails.append(_contact_thumbnail(context_frame, label, peak=relative == 0))
+            details = ""
+        thumbnails.append(
+            _contact_thumbnail(context_frame, label, details, peak=relative == 0)
+        )
+        if relative == 0 and config.export.contact_sheet_include_overlay:
+            overlay_frame = overlay if overlay is not None else np.zeros_like(frame)
+            thumbnails.append(
+                _contact_thumbnail(
+                    overlay_frame,
+                    "DETECTED CHANNEL",
+                    "Magenta mask with yellow outline",
+                )
+            )
 
 
 def export_stills(
@@ -259,12 +320,23 @@ def export_stills(
                 raise RuntimeError(f"Could not write still image: {filename}")
             os.replace(temporary, filename)
         exported += 1
+        overlay = None
+        if (
+            config.export.contact_sheet_include_overlay
+            and candidate.background_frame_number >= 0
+        ):
+            capture.set(cv2.CAP_PROP_POS_FRAMES, candidate.background_frame_number)
+            ok, background = capture.read()
+            if ok:
+                metrics = frame_channel_metrics(background, frame, config)
+                overlay = _channel_overlay(frame, metrics.channel_mask)
         _append_contact_sequence(
             capture,
             frame,
             candidate,
             config,
             thumbnails,
+            overlay,
         )
         reporter.update(index, len(selected))
     capture.release()
@@ -272,6 +344,8 @@ def export_stills(
         reporter.update(len(selected), len(selected), force=True)
     context = max(0, config.export.contact_sheet_context_frames)
     columns = 2 * context + 1 if context else config.export.contact_sheet_columns
+    if config.export.contact_sheet_include_overlay:
+        columns += 1
     if thumbnails:
         blank = np.zeros_like(thumbnails[0])
         while len(thumbnails) % columns:

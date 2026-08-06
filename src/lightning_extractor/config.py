@@ -31,10 +31,14 @@ class ChannelConfig:
     stabilization_min_matches: int = 24
     stabilization_min_inlier_ratio: float = 0.45
     stabilization_ransac_threshold: float = 2.5
+    stabilization_orb_max_residual: float = 3.0
+    stabilization_ecc_enabled: bool = True
+    stabilization_min_ecc_correlation: float = 0.90
     stabilization_max_translation_fraction: float = 0.08
     stabilization_max_rotation_degrees: float = 5.0
     stabilization_max_scale_change: float = 0.05
     stabilization_mask_aligned_edges: bool = True
+    stabilization_edge_mask_dilation: int = 5
     multiframe_enabled: bool = True
     multiframe_width: int = 640
     multiframe_window_seconds: float = 0.06
@@ -50,12 +54,14 @@ class ChannelConfig:
 class ExportConfig:
     top: int = 50
     minimum_geometry_score: float = 25.0
+    minimum_channel_length: float = 40.0
     one_frame_per_event: bool = True
     minimum_winner_geometry_ratio: float = 0.5
     jpeg_quality: int = 96
     contact_sheet_columns: int = 5
     contact_sheet_context_frames: int = 2
     contact_sheet_context_stride: int = 1
+    contact_sheet_include_overlay: bool = True
 
 
 @dataclass(slots=True)

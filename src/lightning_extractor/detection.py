@@ -255,7 +255,11 @@ def frame_channel_metrics(
         # structures. They cannot be lightning because they already existed in the
         # reference frame, so remove a narrow band around those aligned edges.
         static_edges = cv2.Canny(before, 50, 150)
-        static_edges = cv2.dilate(static_edges, np.ones((3, 3), np.uint8))
+        dilation = max(1, config.channel.stabilization_edge_mask_dilation)
+        static_edges = cv2.dilate(
+            static_edges,
+            np.ones((dilation, dilation), np.uint8),
+        )
         channel_response[static_edges > 0] = 0
     channel = channel_response
     channel = cv2.threshold(channel, config.channel.ridge_threshold, 255, cv2.THRESH_BINARY)[1]
@@ -322,28 +326,78 @@ def _prepare_stabilization_reference(
 def _align_reference(
     reference: StabilizationReference, current: np.ndarray, config: Config
 ) -> tuple[np.ndarray, bool]:
-    if (
-        not config.channel.stabilization_enabled
-        or reference.descriptors is None
-        or len(reference.keypoints) < config.channel.stabilization_min_matches
-    ):
+    if not config.channel.stabilization_enabled:
         return reference.gray, False
     width = round(current.shape[1] * reference.scale)
     height = round(current.shape[0] * reference.scale)
     small = cv2.resize(current, (width, height), interpolation=cv2.INTER_AREA)
-    detector = cv2.ORB_create(nfeatures=config.channel.stabilization_max_features)
-    keypoints, descriptors = detector.detectAndCompute(small, None)
-    if descriptors is None or len(keypoints) < config.channel.stabilization_min_matches:
+    matrix = _orb_affine(reference, small, config)
+    if matrix is not None and (
+        not _plausible_affine(matrix, width, height, config)
+        or _alignment_residual(reference, small, matrix)
+        > config.channel.stabilization_orb_max_residual
+    ):
+        matrix = None
+    inverse = False
+    if matrix is None and config.channel.stabilization_ecc_enabled:
+        matrix = _ecc_affine(reference, small, config)
+        inverse = matrix is not None
+    if matrix is None or not _plausible_affine(matrix, width, height, config):
         return reference.gray, False
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
-    pairs = matcher.knnMatch(reference.descriptors, descriptors, k=2)
+    full_matrix = matrix.copy()
+    full_matrix[:, 2] /= reference.scale
+    flags = cv2.INTER_LINEAR | (cv2.WARP_INVERSE_MAP if inverse else 0)
+    aligned = cv2.warpAffine(
+        reference.gray,
+        full_matrix,
+        (current.shape[1], current.shape[0]),
+        flags=flags,
+        borderMode=cv2.BORDER_REFLECT,
+    )
+    return aligned, True
+
+
+def _alignment_residual(
+    reference: StabilizationReference, current: np.ndarray, matrix: np.ndarray
+) -> float:
+    height, width = current.shape
+    reference_small = cv2.resize(
+        reference.gray,
+        (width, height),
+        interpolation=cv2.INTER_AREA,
+    )
+    aligned = cv2.warpAffine(
+        reference_small,
+        matrix,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT,
+    )
+    return float(np.mean(cv2.absdiff(aligned, current)))
+
+
+def _orb_affine(
+    reference: StabilizationReference, current: np.ndarray, config: Config
+) -> np.ndarray | None:
+    if (
+        reference.descriptors is None
+        or len(reference.keypoints) < config.channel.stabilization_min_matches
+    ):
+        return None
+    detector = cv2.ORB_create(nfeatures=config.channel.stabilization_max_features)
+    keypoints, descriptors = detector.detectAndCompute(current, None)
+    if descriptors is None or len(keypoints) < config.channel.stabilization_min_matches:
+        return None
+    pairs = cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(
+        reference.descriptors, descriptors, k=2
+    )
     matches = [
         pair[0]
         for pair in pairs
         if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance
     ]
     if len(matches) < config.channel.stabilization_min_matches:
-        return reference.gray, False
+        return None
     source = np.float32([reference.keypoints[item.queryIdx].pt for item in matches])
     target = np.float32([keypoints[item.trainIdx].pt for item in matches])
     matrix, inliers = cv2.estimateAffinePartial2D(
@@ -352,31 +406,55 @@ def _align_reference(
         method=cv2.RANSAC,
         ransacReprojThreshold=config.channel.stabilization_ransac_threshold,
     )
-    if matrix is None or inliers is None:
-        return reference.gray, False
-    if float(np.mean(inliers)) < config.channel.stabilization_min_inlier_ratio:
-        return reference.gray, False
-    scale = float(np.hypot(matrix[0, 0], matrix[0, 1]))
+    if (
+        matrix is None
+        or inliers is None
+        or float(np.mean(inliers)) < config.channel.stabilization_min_inlier_ratio
+    ):
+        return None
+    return matrix
+
+
+def _ecc_affine(
+    reference: StabilizationReference, current: np.ndarray, config: Config
+) -> np.ndarray | None:
+    height, width = current.shape
+    reference_small = cv2.resize(
+        reference.gray,
+        (width, height),
+        interpolation=cv2.INTER_AREA,
+    )
+    matrix = np.eye(2, 3, dtype=np.float32)
+    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 60, 1e-5)
+    try:
+        correlation, matrix = cv2.findTransformECC(
+            current,
+            reference_small,
+            matrix,
+            cv2.MOTION_AFFINE,
+            criteria,
+            None,
+            3,
+        )
+    except cv2.error:
+        return None
+    if correlation < config.channel.stabilization_min_ecc_correlation:
+        return None
+    return matrix
+
+
+def _plausible_affine(
+    matrix: np.ndarray, width: int, height: int, config: Config
+) -> bool:
+    singular_values = np.linalg.svd(matrix[:, :2], compute_uv=False)
     rotation = abs(math.degrees(math.atan2(matrix[1, 0], matrix[0, 0])))
     translation = float(np.hypot(matrix[0, 2], matrix[1, 2]))
     diagonal = float(np.hypot(width, height))
-    if (
-        abs(scale - 1.0) > config.channel.stabilization_max_scale_change
-        or rotation > config.channel.stabilization_max_rotation_degrees
-        or translation > diagonal * config.channel.stabilization_max_translation_fraction
-    ):
-        return reference.gray, False
-    full_matrix = matrix.copy()
-    full_matrix[:, 2] /= reference.scale
-    return (
-        cv2.warpAffine(
-            reference.gray,
-            full_matrix,
-            (current.shape[1], current.shape[0]),
-            flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_REFLECT,
-        ),
-        True,
+    return bool(
+        np.all(np.abs(singular_values - 1.0) <= config.channel.stabilization_max_scale_change)
+        and rotation <= config.channel.stabilization_max_rotation_degrees
+        and translation
+        <= diagonal * config.channel.stabilization_max_translation_fraction
     )
 
 
@@ -538,6 +616,7 @@ def rank_event_frames(
                     branch_points=metrics.branch_points,
                     channel_thickness=metrics.channel_thickness,
                     frame_quality=metrics.frame_quality,
+                    background_frame_number=start,
                 )
             )
             channel_masks.append(

@@ -12,7 +12,16 @@ from lightning_extractor.pipeline import export_stills, select_export_candidates
 
 
 def candidate(rank: int, event: str, score: float) -> CandidateFrame:
-    return CandidateFrame(rank, event, rank, rank / 100.0, score, 1, 10.0)
+    return CandidateFrame(
+        rank,
+        event,
+        rank,
+        rank / 100.0,
+        score,
+        1,
+        10.0,
+        channel_length=100.0,
+    )
 
 
 class ExportSelectionTests(unittest.TestCase):
@@ -35,7 +44,9 @@ class ExportSelectionTests(unittest.TestCase):
             100.0,
             1,
             10.0,
+            channel_length=100.0,
             frame_quality=100.0,
+            background_frame_number=0,
         )
 
         with TemporaryDirectory() as temporary:
@@ -46,7 +57,7 @@ class ExportSelectionTests(unittest.TestCase):
         self.assertEqual(exported, 1)
         self.assertIsNotNone(sheet)
         assert sheet is not None
-        self.assertEqual(sheet.shape[1], 5 * 640)
+        self.assertEqual(sheet.shape[1], 6 * 640)
 
     def test_selects_one_qualified_frame_per_event(self) -> None:
         config = Config()
@@ -70,6 +81,15 @@ class ExportSelectionTests(unittest.TestCase):
         selected = select_export_candidates(rows, config)
 
         self.assertEqual([row.rank for row in selected], [1])
+
+    def test_short_edge_fragment_is_not_exported(self) -> None:
+        config = Config()
+        row = candidate(1, "event-a", 500.0)
+        row.channel_length = config.export.minimum_channel_length - 1
+
+        selected = select_export_candidates([row], config)
+
+        self.assertEqual(selected, [])
 
     def test_winner_is_longest_clear_frame_within_plausible_geometry(self) -> None:
         config = Config()

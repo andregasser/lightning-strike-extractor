@@ -283,10 +283,14 @@ stabilization_max_features = 1200
 stabilization_min_matches = 24
 stabilization_min_inlier_ratio = 0.45
 stabilization_ransac_threshold = 2.5
+stabilization_orb_max_residual = 3.0
+stabilization_ecc_enabled = true
+stabilization_min_ecc_correlation = 0.90
 stabilization_max_translation_fraction = 0.08
 stabilization_max_rotation_degrees = 5.0
 stabilization_max_scale_change = 0.05
 stabilization_mask_aligned_edges = true
+stabilization_edge_mask_dilation = 5
 multiframe_enabled = true
 multiframe_width = 640
 multiframe_window_seconds = 0.06
@@ -296,12 +300,14 @@ multiframe_bonus_weight = 0.25
 [export]
 top = 50
 minimum_geometry_score = 25.0
+minimum_channel_length = 40.0
 one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.5
 jpeg_quality = 96
 contact_sheet_columns = 5
 contact_sheet_context_frames = 2
 contact_sheet_context_stride = 1
+contact_sheet_include_overlay = true
 ```
 
 `keep_frames_per_event = 0` enables exhaustive selection: every decoded frame
@@ -314,11 +320,13 @@ optional early per-event limit for faster exploratory runs.
 Before comparing an event frame with its pre-event background, the channel
 ranker aligns the background with an affine camera-motion estimate. ORB feature
 matches and RANSAC make the estimate robust against a newly appearing lightning
-channel. Translation, rotation, and scale are accepted only within the configured
-safety limits; too few matches, too few inliers, or an implausible transform
-causes a safe fallback to the unaligned comparison. Static-edge masking removes
-sub-pixel interpolation remnants after successful alignment. Stabilization is
-analysis-only: exported JPEGs always contain the original, unwarped video frame.
+channel. When feature matches are ambiguous or leave excessive residual error,
+ECC intensity alignment provides a second estimate. Translation, rotation,
+scale, match quality, and correlation are accepted only within configured safety
+limits; an implausible transform causes a safe fallback to the unaligned
+comparison. Static-edge masking removes sub-pixel interpolation remnants after
+successful alignment. Stabilization is analysis-only: exported JPEGs always
+contain the original, unwarped video frame.
 
 Multi-frame support compares each detected channel mask with the masks from the
 immediately surrounding frames. Spatially recurring channel geometry receives
@@ -331,8 +339,12 @@ original single frame rather than a synthetic frame stack.
 
 The contact sheet uses one row per selected event by default. Two original
 frames before and after the winner surround a yellow-marked `PEAK` frame. The
-context count and frame stride are configurable, making the temporal evolution
-easy to verify without exporting the neighbouring frames as final stills.
+peak label includes event ID, quality, geometry, channel length and strength,
+branch count, and multi-frame support. An adjacent debug view marks the exact
+channel mask used by the ranker in magenta with a yellow outline. The context
+count, frame stride, and overlay are configurable, making temporal evolution
+and scoring errors easy to verify without exporting review images as final
+stills.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event
