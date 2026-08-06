@@ -284,10 +284,86 @@ limits, and export quality.
 
 ## Supported media
 
-Media support follows the locally installed FFmpeg build. Common containers
-include MP4, MOV, MKV, M4V, and AVI; common codecs include H.264, HEVC, ProRes,
-AV1, and VP9. The analyzer probes the actual streams instead of trusting the
-file extension.
+Input support has two separate layers:
+
+1. Discovery accepts an explicit set of filename extensions.
+2. The contained video stream must be readable by both the local `ffprobe`
+   installation and OpenCV's video backend.
+
+### Explicitly discovered containers
+
+| Container | Extensions | Status |
+| --- | --- | --- |
+| MPEG-4 / ISO Base Media | `.mp4`, `.m4v` | Explicitly supported |
+| QuickTime | `.mov` | Explicitly supported |
+| Matroska | `.mkv` | Explicitly supported |
+| WebM | `.webm` | Explicitly supported |
+| AVI | `.avi` | Explicitly supported |
+
+Extension matching is case-insensitive. Files with other extensions are not
+selected during file or directory discovery, even when the installed FFmpeg
+build could technically decode them.
+
+### Codecs
+
+The project does not maintain a codec whitelist. Codec availability depends on
+the OpenCV wheel/platform and the locally installed media backend. The current
+reference footage verifies **HEVC/H.265 in MP4 at 4K and 100 fps** on macOS, and
+the automated fixtures verify **Motion JPEG in AVI**.
+
+These common combinations are expected to work when the local OpenCV backend
+supports them, but are not all covered by project fixtures yet:
+
+- H.264/AVC in MP4, MOV, or MKV
+- HEVC/H.265 in MP4, MOV, or MKV
+- VP8 or VP9 in WebM or MKV
+- AV1 in MP4, WebM, or MKV
+- ProRes in MOV
+- Motion JPEG in AVI or MOV
+
+`ffprobe` successfully reading a file is necessary but not sufficient: OpenCV
+performs the actual frame decoding. Run both a metadata check and a short
+analysis before committing to a long batch:
+
+```bash
+uv run lightning inspect /path/to/video.mp4
+uv run lightning analyze /path/to/video.mp4 --start 0 --end 30
+```
+
+### Common formats not explicitly supported
+
+The following common containers are currently excluded by discovery and must
+not be presented as supported:
+
+| Format | Typical extensions | Current behavior |
+| --- | --- | --- |
+| MPEG transport stream / AVCHD | `.ts`, `.mts`, `.m2ts` | Not discovered |
+| MPEG program stream / DVD video | `.mpg`, `.mpeg`, `.vob` | Not discovered |
+| Windows Media / ASF | `.wmv`, `.asf` | Not discovered |
+| Flash Video | `.flv`, `.f4v` | Not discovered |
+| 3GPP | `.3gp`, `.3g2` | Not discovered |
+| Ogg video | `.ogv` | Not discovered |
+| Material Exchange Format | `.mxf` | Not discovered |
+| Animated images | `.gif`, animated WebP | Not supported as video input |
+| Image sequences | numbered JPEG, PNG, TIFF, EXR | Not supported |
+| Camera RAW video | `.braw`, `.r3d`, and similar | Not supported |
+| Network streams | RTSP, HLS URLs, HTTP URLs | Not supported; inputs must be local files |
+
+Renaming one of these files to a supported extension is not a reliable
+workaround. Support requires adding the extension to discovery, verifying
+ffprobe and OpenCV decoding, and adding a regression fixture.
+
+### Additional limitations
+
+- A readable video stream and a positive reported frame rate are required.
+- Audio is optional and ignored during analysis.
+- Constant-frame-rate video is the tested path. Variable-frame-rate input uses
+  the reported average frame rate and is not yet fully validated.
+- HDR, 10/12-bit, alpha-channel, and unusual pixel formats may be converted by
+  the local decoder; detection quality for them is not currently guaranteed.
+- Encrypted or DRM-protected media is not supported.
+- Corrupt or truncated input is marked as failed instead of silently producing
+  a complete run.
 
 ## Development
 
