@@ -69,6 +69,24 @@ around `262.24s` is a useful ranking regression reference.
 - Handle videos without audio, empty detections, interrupted runs, and invalid
   media gracefully.
 
+## Quality and documentation
+
+- The project must be well supported by automated tests. Add or update focused
+  tests whenever behavior changes, a bug is fixed, or a new edge case is
+  discovered.
+- Prefer deterministic unit tests for scoring and configuration logic, plus
+  short integration fixtures for end-to-end video behavior. Do not rely on the
+  large local reference video as the only validation path.
+- Treat detection-ranking regressions as product regressions. Preserve known
+  reference behavior unless an intentional algorithm change is documented and
+  validated.
+- Review `README.md` for accuracy regularly, especially after changes to the
+  CLI, installation steps, dependencies, configuration keys, output layout,
+  supported media, project status, or roadmap.
+- Do not leave planned or partially implemented behavior presented as finished
+  functionality in the README. Examples and commands must be runnable against
+  the current codebase.
+
 ## Git and commits
 
 - Use Conventional Commits for every commit.
@@ -85,6 +103,7 @@ around `262.24s` is a useful ranking regression reference.
 - Stage explicit paths when the worktree contains multiple themes.
 - Run the relevant tests before committing and report any check that could not
   be run.
+- Documentation-only changes may skip runtime tests when they cannot affect
+  behavior, but must still pass formatting and link/path sanity checks.
 - Never commit large media or generated artifacts even if they are locally
   present.
-
