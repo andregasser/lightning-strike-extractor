@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import unittest
+
 import cv2
 import numpy as np
-import unittest
 
 from lightning_extractor.config import Config
 from lightning_extractor.detection import frame_geometry_score, percentile
