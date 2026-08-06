@@ -256,9 +256,11 @@ illumination is penalized.
 
 ### 3. Full-resolution export
 
-Only the highest-ranked timestamps are read from the original video for final
-JPEG export. This preserves source resolution without making the entire
-analysis operate on 4K frames.
+Only candidates above the configured geometry threshold are exported, with one
+representative frame per event by default. `top` is an upper limit rather than
+a target that is filled with weak candidates. All candidates remain available
+in JSON and CSV. Exported JPEGs preserve source resolution without making the
+entire analysis operate on 4K frames.
 
 ## Configuration
 
@@ -271,12 +273,25 @@ baseline_seconds = 0.30
 event_gap_seconds = 0.75
 rise_percentile = 0.995
 diff_percentile = 0.995
-keep_frames_per_event = 3
+keep_frames_per_event = 0
+
+[channel]
+analysis_width = 1920
 
 [export]
 top = 50
+minimum_geometry_score = 25.0
+one_frame_per_event = true
+minimum_winner_geometry_ratio = 0.5
 jpeg_quality = 96
 ```
+
+`keep_frames_per_event = 0` enables exhaustive selection: every decoded frame
+from the dynamic interval around an event is measured and retained in the
+candidate data. The exporter first rejects geometrically implausible frames,
+then chooses the remaining frame with the greatest combined channel length,
+strength, connected branching, and clarity. A positive value restores an
+optional early per-event limit for faster exploratory runs.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event

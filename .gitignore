@@ -9,6 +9,7 @@ __pycache__/
 data/inbox/*
 !data/inbox/.gitkeep
 runs/
+runs-v*/
 analysis/
 output/
 previews/
@@ -16,4 +17,5 @@ previews/
 *.mov
 *.mkv
 *.avi
+!tests/fixtures/reference/positive/*.avi
 *.m4v
