@@ -94,15 +94,17 @@ around `262.24s` is a useful ranking regression reference.
 
 ## Git and commits
 
-- Use Conventional Commits for every commit.
+- Use the latest published Conventional Commits specification for every commit
+  (currently Conventional Commits 1.0.0). If this guidance conflicts with a
+  newer published version of the specification, follow the newer version.
 - Follow the canonical structure
   `<type>[optional scope][!]: <description>`, followed by a blank line, the
   required body, and optional footers after another blank line.
 - Every commit must include both a concise Conventional Commit subject and a
-  meaningful body. The body must explain what changed, why it changed, relevant
-  user or developer impact, and how the change was validated. Prefer explaining
-  intent and tradeoffs over restating the diff. Do not create subject-only
-  commits, even though the upstream specification permits an optional body.
+  non-empty, meaningful body. A subject-only commit is forbidden, even when the
+  upstream specification permits an optional body. The body must explain what
+  changed, why it changed, relevant user or developer impact, and how the change
+  was validated. Prefer explaining intent and tradeoffs over restating the diff.
 - Split commits by coherent theme whenever meaningful. Do not combine unrelated
   scaffolding, features, tests, documentation, or fixes into one catch-all
   commit.
