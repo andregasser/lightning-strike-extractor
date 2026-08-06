@@ -25,7 +25,9 @@ exports reviewable stills and machine-readable results.
 - Original videos are read in place and must never be modified.
 - `data/inbox/` is an optional local inbox and is ignored by Git except for its
   `.gitkeep` file.
-- New analyses write isolated runs below `runs/<video>-<source-id>/`.
+- New analyses write isolated runs below
+  `runs/<video>-<source-id>-<analysis-id>/`. The analysis identity includes the
+  source, selected time range, full configuration, and tool version.
 - Keep regenerable caches, machine-readable results, review material, and final
   exports conceptually separate.
 - JSON is the canonical structured output; CSV is a convenience export.

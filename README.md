@@ -103,16 +103,32 @@ uv run lightning analyze /path/to/storm.mp4 \
   --top 10
 ```
 
+Long runs write regular checkpoints. If a run is interrupted, continue the
+exact same source, range, and configuration with `--resume`:
+
+```bash
+uv run lightning analyze /path/to/storm.mp4 \
+  --config config/default.toml \
+  --resume
+```
+
+Progress includes processed frames or events, throughput, elapsed time, and an
+estimated time remaining. Re-running an existing analysis without `--resume`
+is rejected to prevent accidental overwrites.
+
 ## Output
 
-Every source gets a stable run directory based on its filename and source
-identity:
+Every source and analysis setup gets a stable run directory based on the source,
+time range, configuration, and tool version:
 
 ```text
-runs/storm-a84f29c1/
-├── run.json                 # lifecycle and selected time range
+runs/storm-a84f29c1-2bb55de739/
+├── run.json                 # status, phase, identity, timestamps, errors
 ├── source.json              # probed codec, dimensions, FPS, duration
 ├── config.json              # exact settings used for this run
+├── cache/
+│   ├── flash-scan/          # atomic scan checkpoints
+│   └── channel-ranking.json # completed-event checkpoint
 ├── results/
 │   ├── events.json          # canonical lightning event data
 │   ├── events.csv
@@ -194,7 +210,6 @@ conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 ## Roadmap
 
-- Resume interrupted long-running analyses
 - Analyze folders and multiple videos in one command
 - Generate highlight clips and reels from accepted events
 - Add an interactive local review interface
