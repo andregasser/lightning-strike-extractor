@@ -9,6 +9,8 @@ exports reviewable stills and machine-readable results.
 ## Architecture
 
 - Production code lives in `src/lightning_extractor/`.
+- Batch discovery, manifests, scheduling, and summaries live in
+  `src/lightning_extractor/batch.py` and `discovery.py`.
 - The CLI entry point is `lightning_extractor.cli:main` and is exposed as
   `lightning` through `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
@@ -25,9 +27,10 @@ exports reviewable stills and machine-readable results.
 - Original videos are read in place and must never be modified.
 - `data/inbox/` is an optional local inbox and is ignored by Git except for its
   `.gitkeep` file.
-- New analyses write isolated runs below
-  `runs/<video>-<source-id>-<analysis-id>/`. The analysis identity includes the
-  source, selected time range, full configuration, and tool version.
+- New analyses write isolated video runs below
+  `runs/videos/<video>-<source-id>-<analysis-id>/` and batch state below
+  `runs/batches/<batch-id>/`. The analysis identity includes the source,
+  selected time range, full configuration, and tool version.
 - Keep regenerable caches, machine-readable results, review material, and final
   exports conceptually separate.
 - JSON is the canonical structured output; CSV is a convenience export.

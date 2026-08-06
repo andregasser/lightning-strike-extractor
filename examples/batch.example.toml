@@ -1,0 +1,20 @@
+[batch]
+output = "../runs"
+jobs = 1
+config = "../config/default.toml"
+resume = true
+fail_fast = false
+progress = "plain"
+
+# A single video can have its own range and configuration.
+[[video]]
+path = "/Volumes/Storms/camera-a.mp4"
+start = 120.0
+end = 1800.0
+
+# Directories can be discovered recursively with include/exclude filters.
+[[input]]
+path = "/Volumes/Storms/archive"
+recursive = true
+include = ["*.mp4", "*.mov"]
+exclude = ["*preview*", "*proxy*"]

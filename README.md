@@ -94,6 +94,26 @@ uv run lightning analyze /path/to/storm.mp4 \
   --config config/default.toml
 ```
 
+The same command scales to any number of files and directories:
+
+```bash
+uv run lightning analyze \
+  /Volumes/Storms/camera-a.mp4 \
+  /Volumes/Storms/camera-b.mov \
+  /Volumes/Storms/archive \
+  --recursive
+```
+
+Inspect discovery without decoding video:
+
+```bash
+uv run lightning analyze /Volumes/Storms \
+  --recursive \
+  --include "*.mp4" \
+  --exclude "*preview*" \
+  --dry-run
+```
+
 Use a short range while tuning thresholds:
 
 ```bash
@@ -116,34 +136,107 @@ Progress includes processed frames or events, throughput, elapsed time, and an
 estimated time remaining. Re-running an existing analysis without `--resume`
 is rejected to prevent accidental overwrites.
 
+Videos run sequentially by default, which is safest for large HEVC sources on
+one disk. Controlled concurrency is available when the hardware can support it:
+
+```bash
+uv run lightning analyze /Volumes/Storms \
+  --recursive \
+  --jobs 2 \
+  --resume
+```
+
+One invalid video is recorded as failed while the remaining batch continues.
+Use `--fail-fast` when the batch should stop scheduling new videos after the
+first failure. Progress can be emitted as `auto`, `interactive`, `plain`,
+`json`, or `quiet`.
+
 ## Output
 
 Every source and analysis setup gets a stable run directory based on the source,
 time range, configuration, and tool version:
 
 ```text
-runs/storm-a84f29c1-2bb55de739/
-├── run.json                 # status, phase, identity, timestamps, errors
-├── source.json              # probed codec, dimensions, FPS, duration
-├── config.json              # exact settings used for this run
-├── cache/
-│   ├── flash-scan/          # atomic scan checkpoints
-│   └── channel-ranking.json # completed-event checkpoint
-├── results/
-│   ├── events.json          # canonical lightning event data
-│   ├── events.csv
-│   ├── candidates.json      # ranked channel-frame candidates
-│   ├── candidates.csv
-│   └── summary.json
-└── exports/
-    ├── contact-sheet.jpg
-    └── stills/
-        ├── 0001_000262.24s.jpg
-        └── ...
+runs/
+├── batches/
+│   └── batch-248f7728284d/
+│       ├── batch.json       # batch lifecycle and scheduler settings
+│       ├── inputs.json      # resolved, reproducible input set
+│       ├── summary.json
+│       └── summary.csv
+└── videos/
+    └── storm-a84f29c1-2bb55de739/
+        ├── run.json         # status, phase, identity, timestamps, errors
+        ├── source.json      # probed codec, dimensions, FPS, duration
+        ├── config.json      # exact settings used for this run
+        ├── cache/
+        │   ├── flash-scan/
+        │   └── channel-ranking.json
+        ├── results/
+        │   ├── events.json
+        │   ├── events.csv
+        │   ├── candidates.json
+        │   ├── candidates.csv
+        │   └── summary.json
+        └── exports/
+            ├── contact-sheet.jpg
+            └── stills/
 ```
 
 Original media is never copied or changed. Raw videos, run outputs, caches, and
 legacy generated artifacts are excluded from Git.
+
+Inspect accumulated state at any time:
+
+```bash
+uv run lightning runs list
+uv run lightning runs list --status failed
+uv run lightning runs show runs/batches/batch-248f7728284d
+```
+
+## Batch manifests
+
+For large or repeatable collections, use a TOML manifest:
+
+```bash
+uv run lightning analyze --manifest storm-campaign.toml
+```
+
+```toml
+[batch]
+output = "runs"
+jobs = 2
+config = "config/default.toml"
+resume = true
+
+[[video]]
+path = "/Volumes/Storms/camera-a.mp4"
+start = 120.0
+end = 1800.0
+
+[[input]]
+path = "/Volumes/Storms/archive"
+recursive = true
+include = ["*.mp4", "*.mov"]
+exclude = ["*preview*", "*proxy*"]
+```
+
+Paths in a manifest are resolved relative to the manifest file. Each `video` or
+`input` entry can override `config`, `start`, and `end`. See
+[`examples/batch.example.toml`](examples/batch.example.toml) for a complete
+template.
+
+## Exit codes
+
+| Code | Meaning |
+| ---: | --- |
+| `0` | All videos completed or were skipped |
+| `1` | At least one video failed |
+| `2` | Invalid arguments, configuration, or media |
+| `3` | No supported videos were discovered |
+| `4` | ffprobe is missing |
+| `5` | Insufficient disk space |
+| `130` | Interrupted by the user |
 
 ## How detection works
 
@@ -210,7 +303,6 @@ conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 ## Roadmap
 
-- Analyze folders and multiple videos in one command
 - Generate highlight clips and reels from accepted events
 - Add an interactive local review interface
 - Build labeled fixtures for precision/recall evaluation
