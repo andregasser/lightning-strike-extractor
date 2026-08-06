@@ -277,6 +277,16 @@ keep_frames_per_event = 0
 
 [channel]
 analysis_width = 1920
+stabilization_enabled = true
+stabilization_width = 640
+stabilization_max_features = 1200
+stabilization_min_matches = 24
+stabilization_min_inlier_ratio = 0.45
+stabilization_ransac_threshold = 2.5
+stabilization_max_translation_fraction = 0.08
+stabilization_max_rotation_degrees = 5.0
+stabilization_max_scale_change = 0.05
+stabilization_mask_aligned_edges = true
 
 [export]
 top = 50
@@ -292,6 +302,15 @@ candidate data. The exporter first rejects geometrically implausible frames,
 then chooses the remaining frame with the greatest combined channel length,
 strength, connected branching, and clarity. A positive value restores an
 optional early per-event limit for faster exploratory runs.
+
+Before comparing an event frame with its pre-event background, the channel
+ranker aligns the background with an affine camera-motion estimate. ORB feature
+matches and RANSAC make the estimate robust against a newly appearing lightning
+channel. Translation, rotation, and scale are accepted only within the configured
+safety limits; too few matches, too few inliers, or an implausible transform
+causes a safe fallback to the unaligned comparison. Static-edge masking removes
+sub-pixel interpolation remnants after successful alignment. Stabilization is
+analysis-only: exported JPEGs always contain the original, unwarped video frame.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event

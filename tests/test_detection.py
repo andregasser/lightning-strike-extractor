@@ -6,7 +6,17 @@ import cv2
 import numpy as np
 
 from lightning_extractor.config import Config
-from lightning_extractor.detection import frame_geometry_score, percentile
+from lightning_extractor.detection import frame_channel_metrics, frame_geometry_score, percentile
+
+
+def textured_scene() -> np.ndarray:
+    image = np.zeros((360, 640, 3), dtype=np.uint8)
+    for x in range(20, 640, 40):
+        cv2.line(image, (x, 40), (x, 340), (80 + x % 120,) * 3, 2)
+    for y in range(30, 360, 45):
+        cv2.circle(image, (100 + y, y), 12, (180, 180, 180), 2)
+    cv2.putText(image, "STATIC", (220, 190), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (220,) * 3, 3)
+    return image
 
 
 class DetectionTests(unittest.TestCase):
@@ -107,6 +117,42 @@ class DetectionTests(unittest.TestCase):
         self.assertEqual(score, 0)
         self.assertEqual(segments, 0)
         self.assertGreater(area, 0)
+
+    def test_affine_stabilization_suppresses_camera_motion(self) -> None:
+        config = Config()
+        config.channel.analysis_width = 960
+        config.channel.stabilization_width = 480
+        config.channel.stabilization_min_matches = 8
+        previous = textured_scene()
+        transform = cv2.getRotationMatrix2D((320, 180), 1.2, 1.0)
+        transform[:, 2] += (5, -3)
+        current = cv2.warpAffine(previous, transform, (640, 360), borderMode=cv2.BORDER_REFLECT)
+
+        config.channel.stabilization_enabled = False
+        unstable = frame_channel_metrics(previous, current, config)
+        config.channel.stabilization_enabled = True
+        stabilized = frame_channel_metrics(previous, current, config)
+
+        self.assertLess(stabilized.bright_area, unstable.bright_area * 0.35)
+
+    def test_affine_stabilization_preserves_new_lightning_channel(self) -> None:
+        config = Config()
+        config.channel.analysis_width = 960
+        config.channel.stabilization_width = 480
+        config.channel.stabilization_min_matches = 8
+        previous = textured_scene()
+        transform = cv2.getRotationMatrix2D((320, 180), -1.0, 1.0)
+        transform[:, 2] += (-4, 3)
+        moved = cv2.warpAffine(previous, transform, (640, 360), borderMode=cv2.BORDER_REFLECT)
+        lightning = moved.copy()
+        cv2.line(lightning, (80, 300), (500, 40), (255, 255, 255), 3)
+        cv2.line(lightning, (300, 165), (500, 250), (255, 255, 255), 2)
+
+        motion_only = frame_channel_metrics(previous, moved, config)
+        with_lightning = frame_channel_metrics(previous, lightning, config)
+
+        self.assertGreater(with_lightning.channel_length, motion_only.channel_length)
+        self.assertGreater(with_lightning.frame_quality, motion_only.frame_quality)
 
 
 if __name__ == "__main__":

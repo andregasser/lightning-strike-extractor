@@ -15,6 +15,16 @@ checkpoint_seconds = 30.0
 
 [channel]
 analysis_width = 1920
+stabilization_enabled = true
+stabilization_width = 640
+stabilization_max_features = 1200
+stabilization_min_matches = 24
+stabilization_min_inlier_ratio = 0.45
+stabilization_ransac_threshold = 2.5
+stabilization_max_translation_fraction = 0.08
+stabilization_max_rotation_degrees = 5.0
+stabilization_max_scale_change = 0.05
+stabilization_mask_aligned_edges = true
 ridge_threshold = 10
 bright_area_threshold = 20
 minimum_line_length = 12

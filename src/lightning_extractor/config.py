@@ -25,6 +25,16 @@ class AnalysisConfig:
 @dataclass(slots=True)
 class ChannelConfig:
     analysis_width: int = 1920
+    stabilization_enabled: bool = True
+    stabilization_width: int = 640
+    stabilization_max_features: int = 1200
+    stabilization_min_matches: int = 24
+    stabilization_min_inlier_ratio: float = 0.45
+    stabilization_ransac_threshold: float = 2.5
+    stabilization_max_translation_fraction: float = 0.08
+    stabilization_max_rotation_degrees: float = 5.0
+    stabilization_max_scale_change: float = 0.05
+    stabilization_mask_aligned_edges: bool = True
     ridge_threshold: int = 10
     bright_area_threshold: int = 20
     minimum_line_length: int = 12

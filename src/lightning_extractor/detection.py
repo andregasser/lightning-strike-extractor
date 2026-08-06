@@ -29,6 +29,14 @@ class ChannelMetrics:
     frame_quality: float
 
 
+@dataclass(slots=True)
+class StabilizationReference:
+    gray: np.ndarray
+    keypoints: tuple[object, ...]
+    descriptors: np.ndarray | None
+    scale: float
+
+
 def percentile(values: list[float], fraction: float) -> float:
     if not values:
         return 0.0
@@ -229,13 +237,25 @@ def frame_geometry_score(
 
 
 def frame_channel_metrics(
-    previous: np.ndarray, current: np.ndarray, config: Config
+    previous: np.ndarray,
+    current: np.ndarray,
+    config: Config,
+    stabilization_reference: StabilizationReference | None = None,
 ) -> ChannelMetrics:
-    before = _gray(previous, config.channel.analysis_width)
+    reference = stabilization_reference or _prepare_stabilization_reference(previous, config)
+    before = reference.gray
     gray = _gray(current, config.channel.analysis_width)
+    before, stabilized = _align_reference(reference, gray, config)
     temporal = cv2.subtract(gray, before)
     ridge = cv2.subtract(gray, cv2.GaussianBlur(gray, (0, 0), 5.0))
     channel_response = cv2.min(ridge, temporal)
+    if stabilized and config.channel.stabilization_mask_aligned_edges:
+        # Sub-pixel interpolation leaves thin residuals around static, high-contrast
+        # structures. They cannot be lightning because they already existed in the
+        # reference frame, so remove a narrow band around those aligned edges.
+        static_edges = cv2.Canny(before, 50, 150)
+        static_edges = cv2.dilate(static_edges, np.ones((3, 3), np.uint8))
+        channel_response[static_edges > 0] = 0
     channel = channel_response
     channel = cv2.threshold(channel, config.channel.ridge_threshold, 255, cv2.THRESH_BINARY)[1]
     # Do not erode thin channels: at analysis resolution a real lightning branch
@@ -275,6 +295,86 @@ def frame_channel_metrics(
         branches,
         thickness,
         frame_quality,
+    )
+
+
+def _prepare_stabilization_reference(
+    frame: np.ndarray, config: Config
+) -> StabilizationReference:
+    gray = _gray(frame, config.channel.analysis_width)
+    if not config.channel.stabilization_enabled:
+        return StabilizationReference(gray, (), None, 1.0)
+    width = min(config.channel.stabilization_width, gray.shape[1])
+    height = max(1, round(gray.shape[0] * width / gray.shape[1]))
+    small = cv2.resize(gray, (width, height), interpolation=cv2.INTER_AREA)
+    detector = cv2.ORB_create(nfeatures=config.channel.stabilization_max_features)
+    keypoints, descriptors = detector.detectAndCompute(small, None)
+    return StabilizationReference(
+        gray,
+        tuple(keypoints),
+        descriptors,
+        width / gray.shape[1],
+    )
+
+
+def _align_reference(
+    reference: StabilizationReference, current: np.ndarray, config: Config
+) -> tuple[np.ndarray, bool]:
+    if (
+        not config.channel.stabilization_enabled
+        or reference.descriptors is None
+        or len(reference.keypoints) < config.channel.stabilization_min_matches
+    ):
+        return reference.gray, False
+    width = round(current.shape[1] * reference.scale)
+    height = round(current.shape[0] * reference.scale)
+    small = cv2.resize(current, (width, height), interpolation=cv2.INTER_AREA)
+    detector = cv2.ORB_create(nfeatures=config.channel.stabilization_max_features)
+    keypoints, descriptors = detector.detectAndCompute(small, None)
+    if descriptors is None or len(keypoints) < config.channel.stabilization_min_matches:
+        return reference.gray, False
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+    pairs = matcher.knnMatch(reference.descriptors, descriptors, k=2)
+    matches = [
+        pair[0]
+        for pair in pairs
+        if len(pair) == 2 and pair[0].distance < 0.75 * pair[1].distance
+    ]
+    if len(matches) < config.channel.stabilization_min_matches:
+        return reference.gray, False
+    source = np.float32([reference.keypoints[item.queryIdx].pt for item in matches])
+    target = np.float32([keypoints[item.trainIdx].pt for item in matches])
+    matrix, inliers = cv2.estimateAffinePartial2D(
+        source,
+        target,
+        method=cv2.RANSAC,
+        ransacReprojThreshold=config.channel.stabilization_ransac_threshold,
+    )
+    if matrix is None or inliers is None:
+        return reference.gray, False
+    if float(np.mean(inliers)) < config.channel.stabilization_min_inlier_ratio:
+        return reference.gray, False
+    scale = float(np.hypot(matrix[0, 0], matrix[0, 1]))
+    rotation = abs(math.degrees(math.atan2(matrix[1, 0], matrix[0, 0])))
+    translation = float(np.hypot(matrix[0, 2], matrix[1, 2]))
+    diagonal = float(np.hypot(width, height))
+    if (
+        abs(scale - 1.0) > config.channel.stabilization_max_scale_change
+        or rotation > config.channel.stabilization_max_rotation_degrees
+        or translation > diagonal * config.channel.stabilization_max_translation_fraction
+    ):
+        return reference.gray, False
+    full_matrix = matrix.copy()
+    full_matrix[:, 2] /= reference.scale
+    return (
+        cv2.warpAffine(
+            reference.gray,
+            full_matrix,
+            (current.shape[1], current.shape[0]),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REFLECT,
+        ),
+        True,
     )
 
 
@@ -369,12 +469,18 @@ def rank_event_frames(
         ok, background = capture.read()
         if not ok:
             continue
+        stabilization_reference = _prepare_stabilization_reference(background, config)
         local: list[CandidateFrame] = []
         for offset in range(1, count + 1):
             ok, current = capture.read()
             if not ok:
                 break
-            metrics = frame_channel_metrics(background, current, config)
+            metrics = frame_channel_metrics(
+                background,
+                current,
+                config,
+                stabilization_reference=stabilization_reference,
+            )
             local.append(
                 CandidateFrame(
                     rank=0,
