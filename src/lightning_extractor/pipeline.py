@@ -51,6 +51,20 @@ def run_identity(
     return hashlib.sha256(canonical).hexdigest()[:10]
 
 
+def resolve_run_path(
+    video: Path,
+    runs_root: Path,
+    config: Config,
+    start_seconds: float = 0.0,
+    end_seconds: float | None = None,
+    source: dict[str, object] | None = None,
+) -> Path:
+    video = video.resolve()
+    source = source or probe_video(video)
+    identity = run_identity(video, source, config, start_seconds, end_seconds)
+    return runs_root / f"{video.stem}-{_source_id(video)}-{identity}"
+
+
 def _atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
@@ -113,6 +127,8 @@ def export_stills(
     output: Path,
     config: Config,
     resume: bool = False,
+    progress_mode: str = "auto",
+    label: str | None = None,
 ) -> int:
     output.mkdir(parents=True, exist_ok=True)
     capture = cv2.VideoCapture(str(video))
@@ -120,7 +136,7 @@ def export_stills(
         raise RuntimeError(f"OpenCV could not open {video}")
     thumbnails: list[np.ndarray] = []
     selected = candidates[: config.export.top]
-    reporter = ProgressReporter("export", "frames")
+    reporter = ProgressReporter("export", "frames", mode=progress_mode, label=label)
     exported = 0
     for index, candidate in enumerate(selected, 1):
         filename = output / f"{candidate.rank:04d}_{candidate.time:09.2f}s.jpg"
@@ -183,6 +199,8 @@ def analyze(
     start_seconds: float = 0.0,
     end_seconds: float | None = None,
     resume: bool = False,
+    progress_mode: str = "auto",
+    label: str | None = None,
 ) -> Path:
     video = video.resolve()
     source = probe_video(video)
@@ -190,7 +208,8 @@ def analyze(
     if fps <= 0:
         raise RuntimeError("The video frame rate could not be determined")
     identity = run_identity(video, source, config, start_seconds, end_seconds)
-    run = runs_root / f"{video.stem}-{_source_id(video)}-{identity}"
+    run = resolve_run_path(video, runs_root, config, start_seconds, end_seconds, source)
+    label = label or video.name
     results = run / "results"
     exports = run / "exports"
     cache = run / "cache"
@@ -245,7 +264,9 @@ def analyze(
                 if end_seconds is not None
                 else source_end_frame
             )
-            flash_reporter = ProgressReporter("flash scan", "frames")
+            flash_reporter = ProgressReporter(
+                "flash scan", "frames", mode=progress_mode, label=label
+            )
             events = detect_flashes(
                 video,
                 fps,
@@ -288,7 +309,11 @@ def analyze(
                 )
 
             channel_reporter = ProgressReporter(
-                "channel ranking", "events", initial_completed=completed_events
+                "channel ranking",
+                "events",
+                initial_completed=completed_events,
+                mode=progress_mode,
+                label=label,
             )
             candidates = rank_event_frames(
                 video,
@@ -305,7 +330,15 @@ def analyze(
             _write_csv(results / "candidates.csv", (item.as_dict() for item in candidates))
 
         _update_state(run, status="running", phase="export", candidate_count=len(candidates))
-        still_count = export_stills(video, candidates, exports / "stills", config, resume=resume)
+        still_count = export_stills(
+            video,
+            candidates,
+            exports / "stills",
+            config,
+            resume=resume,
+            progress_mode=progress_mode,
+            label=label,
+        )
         _write_json(
             results / "summary.json",
             {

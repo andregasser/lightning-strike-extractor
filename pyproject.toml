@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lightning-strike-extractor"
-version = "0.2.0"
+version = "0.3.0"
 description = "Detect and export the best lightning strikes from videos"
 readme = "README.md"
 requires-python = ">=3.11"
