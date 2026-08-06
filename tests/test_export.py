@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import cv2
 
 from lightning_extractor.config import Config
 from lightning_extractor.models import CandidateFrame
-from lightning_extractor.pipeline import select_export_candidates
+from lightning_extractor.pipeline import export_stills, select_export_candidates
 
 
 def candidate(rank: int, event: str, score: float) -> CandidateFrame:
@@ -12,6 +16,38 @@ def candidate(rank: int, event: str, score: float) -> CandidateFrame:
 
 
 class ExportSelectionTests(unittest.TestCase):
+    def test_contact_sheet_places_context_around_peak(self) -> None:
+        config = Config()
+        config.export.minimum_geometry_score = 0.0
+        config.export.contact_sheet_context_frames = 2
+        fixture = (
+            Path(__file__).parent
+            / "fixtures"
+            / "reference"
+            / "positive"
+            / "gx020425-night-channel.avi"
+        )
+        row = CandidateFrame(
+            1,
+            "event-a",
+            50,
+            0.5,
+            100.0,
+            1,
+            10.0,
+            frame_quality=100.0,
+        )
+
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary) / "exports" / "stills"
+            exported = export_stills(fixture, [row], output, config, progress_mode="never")
+            sheet = cv2.imread(str(output.parent / "contact-sheet.jpg"))
+
+        self.assertEqual(exported, 1)
+        self.assertIsNotNone(sheet)
+        assert sheet is not None
+        self.assertEqual(sheet.shape[1], 5 * 640)
+
     def test_selects_one_qualified_frame_per_event(self) -> None:
         config = Config()
         config.export.minimum_geometry_score = 500.0

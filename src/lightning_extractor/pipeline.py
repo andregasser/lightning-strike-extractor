@@ -167,6 +167,65 @@ def select_export_candidates(
     return selected
 
 
+def _contact_thumbnail(frame: np.ndarray, label: str, peak: bool = False) -> np.ndarray:
+    width = 640
+    height = round(frame.shape[0] * width / frame.shape[1])
+    thumbnail = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+    cv2.rectangle(thumbnail, (0, 0), (width, 38), (0, 0, 0), -1)
+    cv2.putText(
+        thumbnail,
+        label,
+        (8, 27),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    if peak:
+        cv2.rectangle(
+            thumbnail,
+            (2, 2),
+            (width - 3, height - 3),
+            (0, 255, 255),
+            5,
+        )
+    return thumbnail
+
+
+def _append_contact_sequence(
+    capture: cv2.VideoCapture,
+    frame: np.ndarray,
+    candidate: CandidateFrame,
+    config: Config,
+    thumbnails: list[np.ndarray],
+) -> None:
+    context = max(0, config.export.contact_sheet_context_frames)
+    stride = max(1, config.export.contact_sheet_context_stride)
+    total_frames = round(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = capture.get(cv2.CAP_PROP_FPS)
+    for relative in range(-context, context + 1):
+        target = candidate.frame_number + relative * stride
+        context_frame: np.ndarray | None
+        if relative == 0:
+            context_frame = frame
+        elif target < 0 or (total_frames > 0 and target >= total_frames):
+            context_frame = None
+        else:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, target)
+            ok, context_frame = capture.read()
+            if not ok:
+                context_frame = None
+        if context_frame is None:
+            context_frame = np.zeros_like(frame)
+        if relative == 0:
+            label = f"PEAK #{candidate.rank}  {candidate.time:.3f}s"
+        else:
+            time = candidate.time + relative * stride / fps if fps > 0 else candidate.time
+            label = f"{relative * stride:+d}f  {time:.3f}s"
+        thumbnails.append(_contact_thumbnail(context_frame, label, peak=relative == 0))
+
+
 def export_stills(
     video: Path,
     candidates: list[CandidateFrame],
@@ -200,26 +259,19 @@ def export_stills(
                 raise RuntimeError(f"Could not write still image: {filename}")
             os.replace(temporary, filename)
         exported += 1
-        width = 640
-        height = round(frame.shape[0] * width / frame.shape[1])
-        thumb = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
-        cv2.rectangle(thumb, (0, 0), (300, 38), (0, 0, 0), -1)
-        cv2.putText(
-            thumb,
-            f"#{candidate.rank}  {candidate.time:.2f}s",
-            (8, 27),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
+        _append_contact_sequence(
+            capture,
+            frame,
+            candidate,
+            config,
+            thumbnails,
         )
-        thumbnails.append(thumb)
         reporter.update(index, len(selected))
     capture.release()
     if selected:
         reporter.update(len(selected), len(selected), force=True)
-    columns = config.export.contact_sheet_columns
+    context = max(0, config.export.contact_sheet_context_frames)
+    columns = 2 * context + 1 if context else config.export.contact_sheet_columns
     if thumbnails:
         blank = np.zeros_like(thumbnails[0])
         while len(thumbnails) % columns:

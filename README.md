@@ -299,6 +299,9 @@ minimum_geometry_score = 25.0
 one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.5
 jpeg_quality = 96
+contact_sheet_columns = 5
+contact_sheet_context_frames = 2
+contact_sheet_context_stride = 1
 ```
 
 `keep_frames_per_event = 0` enables exhaustive selection: every decoded frame
@@ -325,6 +328,11 @@ short lightning strike remains eligible. Within each event, single-frame
 quality remains the primary winner criterion; multi-frame support only resolves
 a tie. Compact masks limit memory use, and the selected export is the strongest
 original single frame rather than a synthetic frame stack.
+
+The contact sheet uses one row per selected event by default. Two original
+frames before and after the winner surround a yellow-marked `PEAK` frame. The
+context count and frame stride are configurable, making the temporal evolution
+easy to verify without exporting the neighbouring frames as final stills.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event

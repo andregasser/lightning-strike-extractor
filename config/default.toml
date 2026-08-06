@@ -42,3 +42,5 @@ one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.5
 jpeg_quality = 96
 contact_sheet_columns = 5
+contact_sheet_context_frames = 2
+contact_sheet_context_stride = 1

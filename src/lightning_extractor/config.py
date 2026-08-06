@@ -54,6 +54,8 @@ class ExportConfig:
     minimum_winner_geometry_ratio: float = 0.5
     jpeg_quality: int = 96
     contact_sheet_columns: int = 5
+    contact_sheet_context_frames: int = 2
+    contact_sheet_context_stride: int = 1
 
 
 @dataclass(slots=True)
