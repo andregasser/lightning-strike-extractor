@@ -29,6 +29,11 @@ class CandidateFrame:
     geometry_score: float
     line_segments: int
     bright_area: float
+    channel_length: float = 0.0
+    channel_strength: float = 0.0
+    branch_points: int = 0
+    channel_thickness: float = 0.0
+    frame_quality: float = 0.0
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)

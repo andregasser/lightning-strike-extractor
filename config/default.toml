@@ -10,10 +10,11 @@ minimum_rise = 1.0
 minimum_difference = 0.8
 minimum_high_rise = 3.0
 max_events = 0
-keep_frames_per_event = 3
+keep_frames_per_event = 0
 checkpoint_seconds = 30.0
 
 [channel]
+analysis_width = 1920
 ridge_threshold = 10
 bright_area_threshold = 20
 minimum_line_length = 12
@@ -21,5 +22,8 @@ maximum_line_gap = 8
 
 [export]
 top = 50
+minimum_geometry_score = 25.0
+one_frame_per_event = true
+minimum_winner_geometry_ratio = 0.5
 jpeg_quality = 96
 contact_sheet_columns = 5

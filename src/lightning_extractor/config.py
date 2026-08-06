@@ -18,12 +18,13 @@ class AnalysisConfig:
     minimum_difference: float = 0.8
     minimum_high_rise: float = 3.0
     max_events: int = 0
-    keep_frames_per_event: int = 3
+    keep_frames_per_event: int = 0
     checkpoint_seconds: float = 30.0
 
 
 @dataclass(slots=True)
 class ChannelConfig:
+    analysis_width: int = 1920
     ridge_threshold: int = 10
     bright_area_threshold: int = 20
     minimum_line_length: int = 12
@@ -33,6 +34,9 @@ class ChannelConfig:
 @dataclass(slots=True)
 class ExportConfig:
     top: int = 50
+    minimum_geometry_score: float = 25.0
+    one_frame_per_event: bool = True
+    minimum_winner_geometry_ratio: float = 0.5
     jpeg_quality: int = 96
     contact_sheet_columns: int = 5
 

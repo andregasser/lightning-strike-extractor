@@ -5,6 +5,7 @@ import os
 import statistics
 from collections import deque
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -14,6 +15,18 @@ from .config import Config
 from .models import CandidateFrame, FlashEvent
 
 Progress = Callable[[int, int], None]
+
+
+@dataclass(slots=True)
+class ChannelMetrics:
+    score: float
+    line_segments: int
+    bright_area: float
+    channel_length: float
+    channel_strength: float
+    branch_points: int
+    channel_thickness: float
+    frame_quality: float
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -211,32 +224,124 @@ def detect_flashes(
 def frame_geometry_score(
     previous: np.ndarray, current: np.ndarray, config: Config
 ) -> tuple[float, int, float]:
-    before = _gray(previous, config.analysis.width)
-    gray = _gray(current, config.analysis.width)
+    metrics = frame_channel_metrics(previous, current, config)
+    return metrics.score, metrics.line_segments, metrics.bright_area
+
+
+def frame_channel_metrics(
+    previous: np.ndarray, current: np.ndarray, config: Config
+) -> ChannelMetrics:
+    before = _gray(previous, config.channel.analysis_width)
+    gray = _gray(current, config.channel.analysis_width)
     temporal = cv2.subtract(gray, before)
     ridge = cv2.subtract(gray, cv2.GaussianBlur(gray, (0, 0), 5.0))
-    channel = cv2.bitwise_and(ridge, temporal)
+    channel_response = cv2.min(ridge, temporal)
+    channel = channel_response
     channel = cv2.threshold(channel, config.channel.ridge_threshold, 255, cv2.THRESH_BINARY)[1]
-    channel = cv2.morphologyEx(channel, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
-    edges = cv2.Canny(channel, 30, 100)
+    # Do not erode thin channels: at analysis resolution a real lightning branch
+    # may only be one pixel wide. Closing only bridges tiny compression gaps.
+    channel = cv2.morphologyEx(channel, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    skeleton = _skeletonize(channel)
+    bright_area = float(np.count_nonzero(temporal > config.channel.bright_area_threshold))
+    score, best_component, length, strength, branches, thickness = _best_channel_component(
+        channel, skeleton, channel_response
+    )
     lines = cv2.HoughLinesP(
-        edges,
+        best_component,
         1,
         np.pi / 180,
         threshold=12,
         minLineLength=config.channel.minimum_line_length,
         maxLineGap=config.channel.maximum_line_gap,
     )
-    lengths = (
-        []
-        if lines is None
-        else [float(np.hypot(x2 - x1, y2 - y1)) for x1, y1, x2, y2 in lines.reshape(-1, 4)]
+    count = 0 if lines is None else len(lines)
+    # Dense frame-wide edge fields are characteristic of camera motion, grass,
+    # and textured clouds rather than one coherent lightning tree.
+    clutter = float(np.count_nonzero(skeleton))
+    score /= (1.0 + clutter / 5000.0) ** 2
+    score /= 1.0 + bright_area / 100000.0
+    frame_quality = (
+        length
+        * strength
+        * (1.0 + min(branches, 10) * 0.15)
+        / max(thickness, 1.0) ** 2
     )
-    count = len(lengths)
-    bright_area = float(np.count_nonzero(temporal > config.channel.bright_area_threshold))
-    score = sum(sorted(lengths, reverse=True)[:30]) * (1.0 + min(count, 20) / 10.0)
-    score /= 1.0 + bright_area / 12000.0
-    return score, count, bright_area
+    return ChannelMetrics(
+        score,
+        count,
+        bright_area,
+        length,
+        strength,
+        branches,
+        thickness,
+        frame_quality,
+    )
+
+
+def _best_channel_component(
+    mask: np.ndarray, skeleton: np.ndarray, response: np.ndarray
+) -> tuple[float, np.ndarray, float, float, int, float]:
+    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
+    if component_count <= 1:
+        return 0.0, np.zeros_like(mask), 0.0, 0.0, 0, 0.0
+
+    skeleton_pixels = skeleton > 0
+    skeleton_labels = labels[skeleton_pixels]
+    lengths = np.bincount(skeleton_labels, minlength=component_count).astype(float)
+    strength_sums = np.bincount(
+        skeleton_labels,
+        weights=response[skeleton_pixels],
+        minlength=component_count,
+    )
+    areas = stats[:, cv2.CC_STAT_AREA].astype(float)
+    thickness = areas / np.maximum(lengths, 1.0)
+    strengths = strength_sums / np.maximum(lengths, 1.0)
+    rough_scores = lengths * (strengths / 10.0) ** 2 / np.maximum(thickness, 1.0) ** 4
+    rough_scores[0] = 0.0
+
+    best_score = 0.0
+    best_component = np.zeros_like(mask)
+    best_metrics = (0.0, 0.0, 0, 0.0)
+    # Branch analysis is only needed for the strongest thin components, not
+    # thousands of tiny compression or foliage fragments.
+    labels_to_check = np.argsort(rough_scores)[-32:]
+    for label in labels_to_check:
+        if lengths[label] < 8:
+            continue
+        component = np.where((labels == label) & skeleton_pixels, 255, 0).astype(np.uint8)
+        branches = _branch_point_count(component)
+        branch_multiplier = 1.0 + min(branches, 10) * 0.35
+        component_score = rough_scores[label] * branch_multiplier
+        if component_score > best_score:
+            best_score = float(component_score)
+            best_component = component
+            best_metrics = (
+                float(lengths[label]),
+                float(strengths[label]),
+                branches,
+                float(thickness[label]),
+            )
+    return best_score, best_component, *best_metrics
+
+
+def _skeletonize(mask: np.ndarray) -> np.ndarray:
+    remaining = mask.copy()
+    skeleton = np.zeros_like(mask)
+    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+    while cv2.countNonZero(remaining):
+        opened = cv2.morphologyEx(remaining, cv2.MORPH_OPEN, element)
+        skeleton = cv2.bitwise_or(skeleton, cv2.subtract(remaining, opened))
+        remaining = cv2.erode(remaining, element)
+    return skeleton
+
+
+def _branch_point_count(skeleton: np.ndarray) -> int:
+    binary = (skeleton > 0).astype(np.uint8)
+    neighbours = cv2.filter2D(binary, cv2.CV_16S, np.ones((3, 3), np.uint8)) - binary
+    junction_pixels = np.where((binary > 0) & (neighbours >= 3), 255, 0).astype(np.uint8)
+    # One physical fork often spans several adjacent skeleton pixels.
+    components, _ = cv2.connectedComponents(junction_pixels)
+    return max(0, components - 1)
 
 
 def rank_event_frames(
@@ -254,13 +359,14 @@ def rank_event_frames(
         raise RuntimeError(f"OpenCV could not open {video}")
     candidates = list(existing_candidates or [])
     for event_index, event in enumerate(events[completed_events:], completed_events + 1):
-        start = max(0, round((event.peak_time - config.analysis.event_window_before) * fps))
+        start = max(0, round((event.first_time - config.analysis.event_window_before) * fps))
+        end = round((event.last_time + config.analysis.event_window_after) * fps)
         count = max(
             2,
-            round((config.analysis.event_window_before + config.analysis.event_window_after) * fps),
+            end - start,
         )
         capture.set(cv2.CAP_PROP_POS_FRAMES, start)
-        ok, previous = capture.read()
+        ok, background = capture.read()
         if not ok:
             continue
         local: list[CandidateFrame] = []
@@ -268,26 +374,39 @@ def rank_event_frames(
             ok, current = capture.read()
             if not ok:
                 break
-            score, segments, area = frame_geometry_score(previous, current, config)
+            metrics = frame_channel_metrics(background, current, config)
             local.append(
                 CandidateFrame(
-                    0, event.event_id, start + offset, (start + offset) / fps, score, segments, area
+                    rank=0,
+                    event_id=event.event_id,
+                    frame_number=start + offset,
+                    time=(start + offset) / fps,
+                    geometry_score=metrics.score,
+                    line_segments=metrics.line_segments,
+                    bright_area=metrics.bright_area,
+                    channel_length=metrics.channel_length,
+                    channel_strength=metrics.channel_strength,
+                    branch_points=metrics.branch_points,
+                    channel_thickness=metrics.channel_thickness,
+                    frame_quality=metrics.frame_quality,
                 )
             )
-            previous = current
-        selected: list[CandidateFrame] = []
-        for row in sorted(local, key=lambda item: item.geometry_score, reverse=True):
-            if all(abs(row.time - old.time) >= max(0.025, 2 / fps) for old in selected):
-                selected.append(row)
-            if len(selected) == config.analysis.keep_frames_per_event:
-                break
+        if config.analysis.keep_frames_per_event <= 0:
+            selected = local
+        else:
+            selected = []
+            for row in sorted(local, key=lambda item: item.geometry_score, reverse=True):
+                if all(abs(row.time - old.time) >= max(0.025, 2 / fps) for old in selected):
+                    selected.append(row)
+                if len(selected) == config.analysis.keep_frames_per_event:
+                    break
         candidates.extend(selected)
         if checkpoint is not None:
             checkpoint(event_index, candidates)
         if progress is not None:
             progress(event_index, len(events))
     capture.release()
-    candidates.sort(key=lambda item: item.geometry_score, reverse=True)
+    candidates.sort(key=lambda item: item.frame_quality, reverse=True)
     for rank, candidate in enumerate(candidates, 1):
         candidate.rank = rank
     return candidates

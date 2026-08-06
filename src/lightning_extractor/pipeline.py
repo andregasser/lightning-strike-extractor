@@ -121,6 +121,43 @@ def _candidates_from_json(path: Path) -> list[CandidateFrame]:
     return [CandidateFrame(**row) for row in _read_json(path)]  # type: ignore[arg-type]
 
 
+def select_export_candidates(
+    candidates: list[CandidateFrame], config: Config
+) -> list[CandidateFrame]:
+    if config.export.one_frame_per_event:
+        events: dict[str, list[CandidateFrame]] = {}
+        for candidate in candidates:
+            events.setdefault(candidate.event_id, []).append(candidate)
+        selected = []
+        for rows in events.values():
+            best_geometry = max(row.geometry_score for row in rows)
+            if best_geometry < config.export.minimum_geometry_score:
+                continue
+            plausible = [
+                row
+                for row in rows
+                if row.geometry_score
+                >= best_geometry * config.export.minimum_winner_geometry_ratio
+            ]
+            selected.append(
+                max(plausible, key=lambda row: row.frame_quality or row.geometry_score)
+            )
+        selected.sort(
+            key=lambda row: row.frame_quality or row.geometry_score,
+            reverse=True,
+        )
+        return selected[: config.export.top]
+
+    selected: list[CandidateFrame] = []
+    for candidate in candidates:
+        if candidate.geometry_score < config.export.minimum_geometry_score:
+            continue
+        selected.append(candidate)
+        if len(selected) >= config.export.top:
+            break
+    return selected
+
+
 def export_stills(
     video: Path,
     candidates: list[CandidateFrame],
@@ -135,7 +172,7 @@ def export_stills(
     if not capture.isOpened():
         raise RuntimeError(f"OpenCV could not open {video}")
     thumbnails: list[np.ndarray] = []
-    selected = candidates[: config.export.top]
+    selected = select_export_candidates(candidates, config)
     reporter = ProgressReporter("export", "frames", mode=progress_mode, label=label)
     exported = 0
     for index, candidate in enumerate(selected, 1):
@@ -345,7 +382,9 @@ def analyze(
                 "events": len(events),
                 "candidate_frames": len(candidates),
                 "exported_stills": still_count,
-                "best_geometry_score": candidates[0].geometry_score if candidates else 0.0,
+                "best_geometry_score": (
+                    max(item.geometry_score for item in candidates) if candidates else 0.0
+                ),
             },
         )
         _update_state(run, status="complete", phase="complete", completed_at=_utc_now(), error=None)
