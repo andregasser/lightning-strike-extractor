@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-import tomllib
 
 
 @dataclass(slots=True)
@@ -19,6 +19,7 @@ class AnalysisConfig:
     minimum_high_rise: float = 3.0
     max_events: int = 0
     keep_frames_per_event: int = 3
+    checkpoint_seconds: float = 30.0
 
 
 @dataclass(slots=True)

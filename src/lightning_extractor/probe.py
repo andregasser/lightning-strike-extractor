@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 
 class ProbeError(RuntimeError):
@@ -18,10 +18,12 @@ def probe_video(path: Path) -> dict[str, object]:
         raise ProbeError("ffprobe is required but was not found in PATH")
     command = [
         executable,
-        "-v", "error",
+        "-v",
+        "error",
         "-show_entries",
         "format=duration,size,bit_rate,format_name:stream=index,codec_type,codec_name,width,height,avg_frame_rate,pix_fmt,color_space,sample_rate,channels",
-        "-of", "json",
+        "-of",
+        "json",
         str(path),
     ]
     result = subprocess.run(command, check=False, capture_output=True, text=True)
@@ -45,8 +47,5 @@ def probe_video(path: Path) -> dict[str, object]:
         "bit_rate": int(data.get("format", {}).get("bit_rate", 0)),
         "format": data.get("format", {}).get("format_name"),
         "video": {**video_stream, "fps": fps},
-        "has_audio": any(
-            stream.get("codec_type") == "audio" for stream in data.get("streams", [])
-        ),
+        "has_audio": any(stream.get("codec_type") == "audio" for stream in data.get("streams", [])),
     }
-

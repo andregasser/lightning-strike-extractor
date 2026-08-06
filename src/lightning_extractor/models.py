@@ -32,4 +32,3 @@ class CandidateFrame:
 
     def as_dict(self) -> dict[str, object]:
         return asdict(self)
-

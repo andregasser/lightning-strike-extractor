@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from . import __version__
 from .config import load_config
@@ -12,7 +12,9 @@ from .probe import ProbeError, probe_video
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lightning", description="Extract lightning strikes from videos")
+    parser = argparse.ArgumentParser(
+        prog="lightning", description="Extract lightning strikes from videos"
+    )
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
     inspect = commands.add_parser("inspect", help="Show video metadata")
@@ -25,6 +27,11 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--end", type=float, help="End time in seconds")
     run.add_argument("--top", type=int, help="Number of stills to export")
     run.add_argument("--max-events", type=int, help="Maximum events to analyze")
+    run.add_argument(
+        "--resume",
+        action="store_true",
+        help="Continue an interrupted run with the same source, range, and configuration",
+    )
     return parser
 
 
@@ -41,9 +48,12 @@ def main(argv: list[str] | None = None) -> int:
             config.analysis.max_events = args.max_events
         if args.end is not None and args.end <= args.start:
             raise ValueError("--end must be greater than --start")
-        run = analyze(args.video, args.output, config, args.start, args.end)
+        run = analyze(args.video, args.output, config, args.start, args.end, resume=args.resume)
         print(f"analysis complete: {run}")
         return 0
+    except KeyboardInterrupt:
+        print("analysis interrupted; rerun with --resume to continue", file=sys.stderr)
+        return 130
     except (OSError, ValueError, RuntimeError, ProbeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
@@ -51,4 +61,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
