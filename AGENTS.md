@@ -95,16 +95,42 @@ around `262.24s` is a useful ranking regression reference.
 ## Git and commits
 
 - Use Conventional Commits for every commit.
+- Follow the canonical structure
+  `<type>[optional scope][!]: <description>`, followed by a blank line, the
+  required body, and optional footers after another blank line.
+- Every commit must include both a concise Conventional Commit subject and a
+  meaningful body. The body must explain what changed, why it changed, relevant
+  user or developer impact, and how the change was validated. Prefer explaining
+  intent and tradeoffs over restating the diff. Do not create subject-only
+  commits, even though the upstream specification permits an optional body.
 - Split commits by coherent theme whenever meaningful. Do not combine unrelated
   scaffolding, features, tests, documentation, or fixes into one catch-all
   commit.
-- Typical commit types include `feat:`, `fix:`, `refactor:`, `test:`, `docs:`,
-  `chore:`, and `perf:`.
-- Use concise imperative subjects, for example:
+- Use `feat` for user-visible features and `fix` for defects. Other accepted
+  types include `build`, `chore`, `ci`, `docs`, `perf`, `refactor`, `revert`,
+  `style`, and `test`. Use a short noun scope such as `detection`, `cli`, or
+  `export` when it adds useful context; do not invent a scope merely to fill the
+  field.
+- Use concise imperative subjects without a trailing period, for example:
   - `chore: scaffold python project`
-  - `feat: add configurable lightning analysis pipeline`
-  - `test: cover channel geometry scoring`
+  - `feat(detection): rank saturated event frames`
+  - `test(export): cover channel geometry scoring`
   - `docs: document command line usage`
+- Mark breaking changes with `!` in the subject and a
+  `BREAKING CHANGE: <description>` footer. Use Git-trailer-style footers for
+  issue references or other metadata, for example `Refs: #42` or `Closes: #42`.
+- A complete commit message should resemble:
+
+  ```text
+  feat(detection): rank saturated event frames
+
+  Measure original-frame luminance through a channel template taken from
+  adjacent confirmed frames. This keeps a saturated but visible return stroke
+  eligible without allowing distant exposure flashes to inherit its geometry.
+
+  Validate with the positive reference clips, synthetic motion negatives, the
+  full unit suite, and Ruff.
+  ```
 - Stage explicit paths when the worktree contains multiple themes.
 - Run the relevant tests before committing and report any check that could not
   be run.
