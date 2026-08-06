@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "file": "positive/gx010422-daylight-branching.avi",
+      "source": "GX010422.mp4",
+      "source_window_seconds": [75.20, 76.20],
+      "expected_winner_seconds": 0.12,
+      "winner_tolerance_seconds": 0.03,
+      "minimum_channel_length": 100.0,
+      "minimum_channel_strength": 15.0,
+      "description": "Daylight event with a long channel near the top of the frame."
+    },
+    {
+      "file": "positive/gx010425-horizontal-dusk.avi",
+      "source": "GX010425.mp4",
+      "source_window_seconds": [667.68, 668.68],
+      "expected_winner_seconds": 0.49,
+      "winner_tolerance_seconds": 0.03,
+      "minimum_channel_length": 300.0,
+      "minimum_channel_strength": 20.0,
+      "description": "Large horizontal and branching channel at dusk."
+    },
+    {
+      "file": "positive/gx020425-night-channel.avi",
+      "source": "GX020425.mp4",
+      "source_window_seconds": [37.72, 38.72],
+      "expected_winner_seconds": 0.50,
+      "winner_tolerance_seconds": 0.03,
+      "minimum_channel_length": 200.0,
+      "minimum_channel_strength": 20.0,
+      "description": "Dark nighttime event with a visible horizontal channel."
+    }
+  ]
+}
