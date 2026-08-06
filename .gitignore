@@ -1,0 +1,19 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.analysis_deps/
+
+# Large source media and generated artifacts
+data/inbox/*
+!data/inbox/.gitkeep
+runs/
+analysis/
+output/
+previews/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.m4v
+
