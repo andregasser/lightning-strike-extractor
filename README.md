@@ -296,13 +296,17 @@ multiframe_width = 640
 multiframe_window_seconds = 0.06
 multiframe_dilation_pixels = 3
 multiframe_bonus_weight = 0.25
+multiframe_template_min_support = 0.5
+multiframe_peak_radius_frames = 2
 
 [export]
 top = 50
-minimum_geometry_score = 25.0
+minimum_geometry_score = 100.0
+minimum_supported_geometry_score = 25.0
+minimum_low_geometry_multiframe_support = 0.5
 minimum_channel_length = 40.0
 one_frame_per_event = true
-minimum_winner_geometry_ratio = 0.5
+minimum_winner_geometry_ratio = 0.0
 jpeg_quality = 96
 contact_sheet_columns = 5
 contact_sheet_context_frames = 2
@@ -314,7 +318,15 @@ contact_sheet_include_overlay = true
 from the dynamic interval around an event is measured and retained in the
 candidate data. The exporter first rejects geometrically implausible frames,
 then chooses the remaining frame with the greatest combined channel length,
-strength, connected branching, and clarity. A positive value restores an
+quadratically weighted original-frame luminance, connected branching, and
+clarity. Temporal response validates that a channel is new, but no longer acts
+as a proxy for its visible brightness. Thickness receives only a linear clarity
+penalty so that natural bloom around a powerful channel is not punished twice.
+A frame below the normal geometry threshold remains eligible only when it clears
+the lower safety floor and the same channel geometry has strong multi-frame
+support. This preserves bright, sky-illuminating peaks without admitting isolated
+motion artifacts.
+A positive value restores an
 optional early per-event limit for faster exploratory runs.
 
 Before comparing an event frame with its pre-event background, the channel
@@ -336,6 +348,14 @@ short lightning strike remains eligible. Within each event, single-frame
 quality remains the primary winner criterion; multi-frame support only resolves
 a tie. Compact masks limit memory use, and the selected export is the strongest
 original single frame rather than a synthetic frame stack.
+
+For saturated peak frames where local differencing can temporarily lose the
+channel itself, a strongly supported neighbouring channel mask acts as an event
+template. The tool measures every original frame through that shared geometry,
+allowing the truly brightest instant to win even when sky illumination reduces
+local contrast. Template transfer is limited to two direct neighbouring frames
+so a nearby broad exposure flash cannot inherit unrelated channel geometry. The
+exported image remains the untouched original frame.
 
 The contact sheet uses one row per selected event by default. Two original
 frames before and after the winner surround a yellow-marked `PEAK` frame. The

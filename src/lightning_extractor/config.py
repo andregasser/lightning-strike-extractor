@@ -44,6 +44,8 @@ class ChannelConfig:
     multiframe_window_seconds: float = 0.06
     multiframe_dilation_pixels: int = 3
     multiframe_bonus_weight: float = 0.25
+    multiframe_template_min_support: float = 0.5
+    multiframe_peak_radius_frames: int = 2
     ridge_threshold: int = 10
     bright_area_threshold: int = 20
     minimum_line_length: int = 12
@@ -53,10 +55,12 @@ class ChannelConfig:
 @dataclass(slots=True)
 class ExportConfig:
     top: int = 50
-    minimum_geometry_score: float = 25.0
+    minimum_geometry_score: float = 100.0
+    minimum_supported_geometry_score: float = 25.0
+    minimum_low_geometry_multiframe_support: float = 0.5
     minimum_channel_length: float = 40.0
     one_frame_per_event: bool = True
-    minimum_winner_geometry_ratio: float = 0.5
+    minimum_winner_geometry_ratio: float = 0.0
     jpeg_quality: int = 96
     contact_sheet_columns: int = 5
     contact_sheet_context_frames: int = 2

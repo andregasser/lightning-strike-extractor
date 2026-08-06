@@ -7,6 +7,7 @@ import numpy as np
 
 from lightning_extractor.config import Config
 from lightning_extractor.detection import (
+    _apply_multiframe_peak_quality,
     _apply_multiframe_support,
     frame_channel_metrics,
     frame_geometry_score,
@@ -26,6 +27,71 @@ def textured_scene() -> np.ndarray:
 
 
 class DetectionTests(unittest.TestCase):
+    def test_peak_template_recovers_saturated_adjacent_frame(self) -> None:
+        config = Config()
+        target = CandidateFrame(
+            0,
+            "event",
+            10,
+            0.10,
+            1.0,
+            0,
+            1000.0,
+            channel_length=10.0,
+            channel_thickness=1.0,
+            frame_quality=1.0,
+        )
+        template = CandidateFrame(
+            0,
+            "event",
+            11,
+            0.11,
+            100.0,
+            1,
+            10.0,
+            channel_length=80.0,
+            branch_points=3,
+            channel_thickness=1.0,
+            frame_quality=100.0,
+            multiframe_support=1.0,
+        )
+        empty = np.zeros((40, 40), dtype=np.uint8)
+        channel = empty.copy()
+        cv2.line(channel, (20, 35), (20, 5), 255, 1)
+        bright = np.full((40, 40), 240, dtype=np.uint8)
+        normal = np.full((40, 40), 120, dtype=np.uint8)
+
+        _apply_multiframe_peak_quality(
+            [target, template],
+            [empty, channel],
+            [bright, normal],
+            config,
+        )
+
+        self.assertEqual(target.channel_template_frame_number, template.frame_number)
+        self.assertEqual(target.peak_multiframe_support, 1.0)
+        self.assertGreater(target.frame_quality, template.frame_quality)
+
+    def test_peak_template_does_not_cross_frame_radius(self) -> None:
+        config = Config()
+        candidates = [
+            CandidateFrame(0, "event", index, index / 100.0, 1.0, 0, 1.0)
+            for index in range(4)
+        ]
+        candidates[-1].multiframe_support = 1.0
+        candidates[-1].channel_length = 100.0
+        candidates[-1].channel_thickness = 1.0
+        masks = [np.zeros((20, 20), dtype=np.uint8) for _ in candidates]
+        cv2.line(masks[-1], (10, 18), (10, 2), 255, 1)
+        grays = [np.full((20, 20), 250, dtype=np.uint8) for _ in candidates]
+
+        _apply_multiframe_peak_quality(candidates, masks, grays, config)
+
+        self.assertNotEqual(
+            candidates[0].channel_template_frame_number,
+            candidates[-1].frame_number,
+        )
+
     def test_multiframe_support_rewards_repeated_channel_geometry(self) -> None:
         config = Config()
         candidates = [
@@ -86,6 +152,19 @@ class DetectionTests(unittest.TestCase):
         strong_score, _, _ = frame_geometry_score(background, strong, config)
 
         self.assertGreater(strong_score, faint_score)
+
+    def test_frame_quality_weights_channel_luminance_superlinearly(self) -> None:
+        config = Config()
+        background = np.zeros((540, 960, 3), dtype=np.uint8)
+        medium = background.copy()
+        strong = background.copy()
+        cv2.line(medium, (100, 500), (800, 60), (100, 100, 100), 2)
+        cv2.line(strong, (100, 500), (800, 60), (200, 200, 200), 2)
+
+        medium_metrics = frame_channel_metrics(background, medium, config)
+        strong_metrics = frame_channel_metrics(background, strong, config)
+
+        self.assertGreater(strong_metrics.frame_quality, medium_metrics.frame_quality * 3)
 
     def test_geometry_rewards_branching_channel(self) -> None:
         config = Config()

@@ -91,8 +91,37 @@ class ExportSelectionTests(unittest.TestCase):
 
         self.assertEqual(selected, [])
 
+    def test_multiframe_support_can_confirm_bright_low_geometry_peak(self) -> None:
+        config = Config()
+        row = candidate(1, "event-a", 50.0)
+        row.multiframe_support = 0.9
+
+        selected = select_export_candidates([row], config)
+
+        self.assertEqual(selected, [row])
+
+    def test_isolated_low_geometry_candidate_is_not_exported(self) -> None:
+        config = Config()
+        row = candidate(1, "event-a", 50.0)
+        row.multiframe_support = 0.1
+
+        selected = select_export_candidates([row], config)
+
+        self.assertEqual(selected, [])
+
+    def test_shared_channel_template_can_recover_saturated_peak(self) -> None:
+        config = Config()
+        row = candidate(1, "event-a", 1.0)
+        row.peak_multiframe_support = 0.9
+        row.channel_template_frame_number = row.frame_number + 1
+
+        selected = select_export_candidates([row], config)
+
+        self.assertEqual(selected, [row])
+
     def test_winner_is_longest_clear_frame_within_plausible_geometry(self) -> None:
         config = Config()
+        config.export.minimum_geometry_score = 25.0
         rows = [
             candidate(1, "event-a", 100.0),
             candidate(2, "event-a", 60.0),
@@ -108,6 +137,7 @@ class ExportSelectionTests(unittest.TestCase):
 
     def test_strongest_frame_wins_despite_multiframe_bonus(self) -> None:
         config = Config()
+        config.export.minimum_geometry_score = 25.0
         rows = [candidate(1, "event-a", 100.0), candidate(2, "event-a", 90.0)]
         rows[0].frame_quality = 100.0
         rows[0].multiframe_quality = 100.0
@@ -120,6 +150,7 @@ class ExportSelectionTests(unittest.TestCase):
 
     def test_multiframe_support_breaks_equal_strength_tie(self) -> None:
         config = Config()
+        config.export.minimum_geometry_score = 25.0
         rows = [candidate(1, "event-a", 100.0), candidate(2, "event-a", 90.0)]
         rows[0].frame_quality = 100.0
         rows[0].multiframe_support = 0.2

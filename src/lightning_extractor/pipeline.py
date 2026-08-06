@@ -124,24 +124,40 @@ def _candidates_from_json(path: Path) -> list[CandidateFrame]:
 def select_export_candidates(
     candidates: list[CandidateFrame], config: Config
 ) -> list[CandidateFrame]:
+    def is_qualified(row: CandidateFrame) -> bool:
+        geometry_qualified = row.geometry_score >= config.export.minimum_geometry_score
+        own_mask_supported = (
+            row.geometry_score >= config.export.minimum_supported_geometry_score
+            and row.multiframe_support
+            >= config.export.minimum_low_geometry_multiframe_support
+        )
+        shared_template_supported = (
+            row.channel_template_frame_number >= 0
+            and row.channel_template_frame_number != row.frame_number
+            and row.peak_multiframe_support
+            >= config.export.minimum_low_geometry_multiframe_support
+        )
+        return row.channel_length >= config.export.minimum_channel_length and (
+            geometry_qualified or own_mask_supported or shared_template_supported
+        )
+
     if config.export.one_frame_per_event:
         events: dict[str, list[CandidateFrame]] = {}
         for candidate in candidates:
             events.setdefault(candidate.event_id, []).append(candidate)
         selected = []
         for rows in events.values():
-            qualified = [
+            qualified_rows = [
                 row
                 for row in rows
-                if row.geometry_score >= config.export.minimum_geometry_score
-                and row.channel_length >= config.export.minimum_channel_length
+                if is_qualified(row)
             ]
-            if not qualified:
+            if not qualified_rows:
                 continue
-            best_geometry = max(row.geometry_score for row in qualified)
+            best_geometry = max(row.geometry_score for row in qualified_rows)
             plausible = [
                 row
-                for row in qualified
+                for row in qualified_rows
                 if row.geometry_score
                 >= best_geometry * config.export.minimum_winner_geometry_ratio
             ]
@@ -165,10 +181,7 @@ def select_export_candidates(
 
     selected: list[CandidateFrame] = []
     for candidate in candidates:
-        if (
-            candidate.geometry_score < config.export.minimum_geometry_score
-            or candidate.channel_length < config.export.minimum_channel_length
-        ):
+        if not is_qualified(candidate):
             continue
         selected.append(candidate)
         if len(selected) >= config.export.top:
@@ -266,8 +279,10 @@ def _append_contact_sequence(
             label = f"PEAK #{candidate.rank}  {candidate.event_id}  {candidate.time:.3f}s"
             details = (
                 f"Q {candidate.frame_quality:.0f}  G {candidate.geometry_score:.0f}  "
-                f"L {candidate.channel_length:.0f}  S {candidate.channel_strength:.1f}  "
-                f"B {candidate.branch_points}  MF {candidate.multiframe_support:.2f}"
+                f"L {candidate.channel_length:.0f}  Y {candidate.channel_luminance:.1f}  "
+                f"S {candidate.channel_strength:.1f}  "
+                f"B {candidate.branch_points}  "
+                f"MF {max(candidate.multiframe_support, candidate.peak_multiframe_support):.2f}"
             )
         else:
             time = candidate.time + relative * stride / fps if fps > 0 else candidate.time
@@ -328,7 +343,16 @@ def export_stills(
             capture.set(cv2.CAP_PROP_POS_FRAMES, candidate.background_frame_number)
             ok, background = capture.read()
             if ok:
-                metrics = frame_channel_metrics(background, frame, config)
+                template = frame
+                if candidate.channel_template_frame_number >= 0:
+                    capture.set(
+                        cv2.CAP_PROP_POS_FRAMES,
+                        candidate.channel_template_frame_number,
+                    )
+                    template_ok, template_frame = capture.read()
+                    if template_ok:
+                        template = template_frame
+                metrics = frame_channel_metrics(background, template, config)
                 overlay = _channel_overlay(frame, metrics.channel_mask)
         _append_contact_sequence(
             capture,

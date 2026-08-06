@@ -34,6 +34,8 @@ multiframe_width = 640
 multiframe_window_seconds = 0.06
 multiframe_dilation_pixels = 3
 multiframe_bonus_weight = 0.25
+multiframe_template_min_support = 0.5
+multiframe_peak_radius_frames = 2
 ridge_threshold = 10
 bright_area_threshold = 20
 minimum_line_length = 12
@@ -41,10 +43,12 @@ maximum_line_gap = 8
 
 [export]
 top = 50
-minimum_geometry_score = 25.0
+minimum_geometry_score = 100.0
+minimum_supported_geometry_score = 25.0
+minimum_low_geometry_multiframe_support = 0.5
 minimum_channel_length = 40.0
 one_frame_per_event = true
-minimum_winner_geometry_ratio = 0.5
+minimum_winner_geometry_ratio = 0.0
 jpeg_quality = 96
 contact_sheet_columns = 5
 contact_sheet_context_frames = 2

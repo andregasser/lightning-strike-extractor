@@ -24,6 +24,7 @@ class ChannelMetrics:
     bright_area: float
     channel_length: float
     channel_strength: float
+    channel_luminance: float
     branch_points: int
     channel_thickness: float
     frame_quality: float
@@ -271,6 +272,8 @@ def frame_channel_metrics(
     score, best_component, length, strength, branches, thickness = _best_channel_component(
         channel, skeleton, channel_response
     )
+    component_pixels = best_component > 0
+    luminance = float(np.mean(gray[component_pixels])) if np.any(component_pixels) else 0.0
     lines = cv2.HoughLinesP(
         best_component,
         1,
@@ -287,9 +290,9 @@ def frame_channel_metrics(
     score /= 1.0 + bright_area / 100000.0
     frame_quality = (
         length
-        * strength
+        * (luminance / 10.0) ** 2
         * (1.0 + min(branches, 10) * 0.15)
-        / max(thickness, 1.0) ** 2
+        / max(thickness, 1.0)
     )
     return ChannelMetrics(
         score,
@@ -297,6 +300,7 @@ def frame_channel_metrics(
         bright_area,
         length,
         strength,
+        luminance,
         branches,
         thickness,
         frame_quality,
@@ -564,6 +568,65 @@ def _compact_channel_mask(mask: np.ndarray, config: Config) -> np.ndarray:
     return cv2.resize(mask, (width, height), interpolation=cv2.INTER_NEAREST)
 
 
+def _compact_gray(frame: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    height, width = shape
+    return cv2.resize(gray, (width, height), interpolation=cv2.INTER_AREA)
+
+
+def _apply_multiframe_peak_quality(
+    candidates: list[CandidateFrame],
+    channel_masks: list[np.ndarray],
+    frame_grays: list[np.ndarray],
+    config: Config,
+) -> None:
+    if not config.channel.multiframe_enabled:
+        return
+    radius = max(1, config.channel.multiframe_dilation_pixels)
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (radius * 2 + 1, radius * 2 + 1),
+    )
+    radius_frames = max(0, config.channel.multiframe_peak_radius_frames)
+    for index, candidate in enumerate(candidates):
+        sampled_gray = cv2.dilate(frame_grays[index], kernel)
+        best_quality = candidate.frame_quality
+        best_luminance = candidate.channel_luminance
+        best_support = candidate.multiframe_support
+        best_template = candidate.frame_number
+        for template_index, template in enumerate(candidates):
+            if abs(template_index - index) > radius_frames:
+                continue
+            if (
+                template_index != index
+                and template.multiframe_support
+                < config.channel.multiframe_template_min_support
+            ):
+                continue
+            mask = channel_masks[template_index] > 0
+            if not np.any(mask):
+                continue
+            luminance = float(np.mean(sampled_gray[mask]))
+            quality = (
+                template.channel_length
+                * (luminance / 10.0) ** 2
+                * (1.0 + min(template.branch_points, 10) * 0.15)
+                / max(template.channel_thickness, 1.0)
+            )
+            if quality > best_quality:
+                best_quality = quality
+                best_luminance = luminance
+                best_support = template.multiframe_support
+                best_template = template.frame_number
+        candidate.frame_quality = best_quality
+        candidate.channel_luminance = best_luminance
+        candidate.peak_multiframe_support = best_support
+        candidate.channel_template_frame_number = best_template
+        candidate.multiframe_quality = best_quality * (
+            1.0 + config.channel.multiframe_bonus_weight * best_support
+        )
+
+
 def rank_event_frames(
     video: Path,
     fps: float,
@@ -592,6 +655,7 @@ def rank_event_frames(
         stabilization_reference = _prepare_stabilization_reference(background, config)
         local: list[CandidateFrame] = []
         channel_masks: list[np.ndarray] = []
+        frame_grays: list[np.ndarray] = []
         for offset in range(1, count + 1):
             ok, current = capture.read()
             if not ok:
@@ -613,6 +677,7 @@ def rank_event_frames(
                     bright_area=metrics.bright_area,
                     channel_length=metrics.channel_length,
                     channel_strength=metrics.channel_strength,
+                    channel_luminance=metrics.channel_luminance,
                     branch_points=metrics.branch_points,
                     channel_thickness=metrics.channel_thickness,
                     frame_quality=metrics.frame_quality,
@@ -627,7 +692,9 @@ def rank_event_frames(
                     config,
                 )
             )
+            frame_grays.append(_compact_gray(current, channel_masks[-1].shape))
         _apply_multiframe_support(local, channel_masks, config)
+        _apply_multiframe_peak_quality(local, channel_masks, frame_grays, config)
         if config.analysis.keep_frames_per_event <= 0:
             selected = local
         else:

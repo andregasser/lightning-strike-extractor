@@ -10,6 +10,7 @@ data/inbox/*
 !data/inbox/.gitkeep
 runs/
 runs-v*/
+calibration-runs*/
 analysis/
 output/
 previews/
