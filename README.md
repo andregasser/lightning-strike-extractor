@@ -180,7 +180,15 @@ runs/
         │   └── summary.json
         └── exports/
             ├── contact-sheet.jpg
-            └── stills/
+            ├── stills/
+            └── events/
+                └── evt_000001_000075.630s/
+                    ├── frame_-02.jpg
+                    ├── frame_-01.jpg
+                    ├── frame_peak.jpg
+                    ├── frame_+01.jpg
+                    ├── frame_+02.jpg
+                    └── slow-motion.mp4
 ```
 
 Original media is never copied or changed. Raw videos, run outputs, caches, and
@@ -312,6 +320,13 @@ contact_sheet_columns = 5
 contact_sheet_context_frames = 2
 contact_sheet_context_stride = 1
 contact_sheet_include_overlay = true
+event_frames_enabled = true
+slow_motion_enabled = true
+slow_motion_before_seconds = 0.25
+slow_motion_after_seconds = 0.25
+slow_motion_factor = 4.0
+slow_motion_output_fps = 25
+slow_motion_crf = 18
 ```
 
 `keep_frames_per_event = 0` enables exhaustive selection: every decoded frame
@@ -365,6 +380,14 @@ channel mask used by the ranker in magenta with a yellow outline. The context
 count, frame stride, and overlay are configurable, making temporal evolution
 and scoring errors easy to verify without exporting review images as final
 stills.
+
+Each selected event also receives a high-resolution export directory. By
+default it contains the same five original frames shown around the contact-sheet
+peak, plus a two-second H.264 slow-motion clip made from 0.25 seconds before and
+after the peak at four-times slowdown. Context count and stride control both the
+contact sheet and high-resolution frame sequence. Slow-motion window, factor,
+output frame rate, and quality are independently configurable. Audio is omitted
+from these short review clips.
 
 Copy the file to create camera- or scenario-specific profiles. Available
 settings cover event windows, adaptive cutoffs, geometry thresholds, event

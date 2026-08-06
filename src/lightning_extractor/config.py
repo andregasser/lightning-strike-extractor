@@ -66,6 +66,13 @@ class ExportConfig:
     contact_sheet_context_frames: int = 2
     contact_sheet_context_stride: int = 1
     contact_sheet_include_overlay: bool = True
+    event_frames_enabled: bool = True
+    slow_motion_enabled: bool = True
+    slow_motion_before_seconds: float = 0.25
+    slow_motion_after_seconds: float = 0.25
+    slow_motion_factor: float = 4.0
+    slow_motion_output_fps: int = 25
+    slow_motion_crf: int = 18
 
 
 @dataclass(slots=True)

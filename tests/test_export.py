@@ -53,11 +53,23 @@ class ExportSelectionTests(unittest.TestCase):
             output = Path(temporary) / "exports" / "stills"
             exported = export_stills(fixture, [row], output, config, progress_mode="never")
             sheet = cv2.imread(str(output.parent / "contact-sheet.jpg"))
+            event_directory = output.parent / "events" / "event-a_000000.500s"
+            event_frames = sorted(event_directory.glob("frame_*.jpg"))
+            slow_motion = event_directory / "slow-motion.mp4"
+            slow_motion_exists = slow_motion.is_file()
+            slow_capture = cv2.VideoCapture(str(slow_motion))
+            slow_frame_count = round(slow_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            slow_fps = slow_capture.get(cv2.CAP_PROP_FPS)
+            slow_capture.release()
 
         self.assertEqual(exported, 1)
         self.assertIsNotNone(sheet)
         assert sheet is not None
         self.assertEqual(sheet.shape[1], 6 * 640)
+        self.assertEqual(len(event_frames), 5)
+        self.assertTrue(slow_motion_exists)
+        self.assertGreater(slow_fps, 0)
+        self.assertGreaterEqual(slow_frame_count / slow_fps, 1.8)
 
     def test_selects_one_qualified_frame_per_event(self) -> None:
         config = Config()

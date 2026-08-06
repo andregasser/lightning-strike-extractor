@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -302,6 +303,114 @@ def _append_contact_sequence(
             )
 
 
+def _write_jpeg(path: Path, frame: np.ndarray, quality: int) -> None:
+    temporary = path.with_name(f".{path.name}.tmp.jpg")
+    if not cv2.imwrite(str(temporary), frame, [cv2.IMWRITE_JPEG_QUALITY, quality]):
+        raise RuntimeError(f"Could not write still image: {path}")
+    os.replace(temporary, path)
+
+
+def _event_export_directory(output: Path, candidate: CandidateFrame) -> Path:
+    return output.parent / "events" / f"{candidate.event_id}_{candidate.time:010.3f}s"
+
+
+def _export_event_frames(
+    capture: cv2.VideoCapture,
+    peak_frame: np.ndarray,
+    candidate: CandidateFrame,
+    destination: Path,
+    config: Config,
+    resume: bool,
+) -> None:
+    if not config.export.event_frames_enabled:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    context = max(0, config.export.contact_sheet_context_frames)
+    stride = max(1, config.export.contact_sheet_context_stride)
+    total_frames = round(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+    for relative in range(-context, context + 1):
+        label = "peak" if relative == 0 else f"{relative * stride:+03d}"
+        path = destination / f"frame_{label}.jpg"
+        if resume and path.exists():
+            continue
+        target = candidate.frame_number + relative * stride
+        if total_frames > 0:
+            target = min(max(target, 0), total_frames - 1)
+        if relative == 0:
+            frame = peak_frame
+        else:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, target)
+            ok, frame = capture.read()
+            if not ok:
+                raise RuntimeError(
+                    f"Could not read context frame {target} for {candidate.event_id}"
+                )
+        _write_jpeg(path, frame, config.export.jpeg_quality)
+
+
+def _export_slow_motion(
+    video: Path,
+    candidate: CandidateFrame,
+    destination: Path,
+    config: Config,
+    resume: bool,
+) -> None:
+    if not config.export.slow_motion_enabled:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    output = destination / "slow-motion.mp4"
+    if resume and output.exists():
+        return
+    executable = shutil.which("ffmpeg")
+    if executable is None:
+        raise RuntimeError("ffmpeg is required for slow-motion event exports")
+    before = max(0.0, config.export.slow_motion_before_seconds)
+    after = max(0.0, config.export.slow_motion_after_seconds)
+    duration = before + after
+    factor = max(1.0, config.export.slow_motion_factor)
+    fps = max(1, config.export.slow_motion_output_fps)
+    start = max(0.0, candidate.time - before)
+    temporary = output.with_name(f".{output.name}.tmp.mp4")
+    command = [
+        executable,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-ss",
+        f"{start:.6f}",
+        "-t",
+        f"{duration:.6f}",
+        "-i",
+        str(video),
+        "-map",
+        "0:v:0",
+        "-an",
+        "-dn",
+        "-sn",
+        "-vf",
+        f"setpts={factor:.6f}*PTS,fps={fps}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        str(config.export.slow_motion_crf),
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        str(temporary),
+    ]
+    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    if result.returncode:
+        temporary.unlink(missing_ok=True)
+        raise RuntimeError(
+            result.stderr.strip() or f"Could not export slow motion for {candidate.event_id}"
+        )
+    os.replace(temporary, output)
+
+
 def export_stills(
     video: Path,
     candidates: list[CandidateFrame],
@@ -328,13 +437,24 @@ def export_stills(
             if not ok:
                 reporter.update(index, len(selected))
                 continue
-            temporary = filename.with_name(f".{filename.name}.tmp.jpg")
-            if not cv2.imwrite(
-                str(temporary), frame, [cv2.IMWRITE_JPEG_QUALITY, config.export.jpeg_quality]
-            ):
-                raise RuntimeError(f"Could not write still image: {filename}")
-            os.replace(temporary, filename)
+            _write_jpeg(filename, frame, config.export.jpeg_quality)
         exported += 1
+        event_directory = _event_export_directory(output, candidate)
+        _export_event_frames(
+            capture,
+            frame,
+            candidate,
+            event_directory,
+            config,
+            resume,
+        )
+        _export_slow_motion(
+            video,
+            candidate,
+            event_directory,
+            config,
+            resume,
+        )
         overlay = None
         if (
             config.export.contact_sheet_include_overlay
