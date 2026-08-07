@@ -85,6 +85,13 @@ around `262.24s` is a useful ranking regression reference.
 - Treat detection-ranking regressions as product regressions. Preserve known
   reference behavior unless an intentional algorithm change is documented and
   validated.
+- After every substantial change, perform a comprehensive code review before
+  committing or handing off the work. Review the complete affected execution
+  path rather than only the edited lines, and check architecture and API
+  consistency, correctness, failure and interruption behavior, security and
+  resource usage, backward compatibility, test coverage, documentation, and
+  unintended changes elsewhere in the worktree. Resolve all actionable findings
+  and rerun the relevant checks after review-driven edits.
 - Review `README.md` for accuracy regularly, especially after changes to the
   CLI, installation steps, dependencies, configuration keys, output layout,
   supported media, project status, or roadmap.
@@ -94,6 +101,9 @@ around `262.24s` is a useful ranking regression reference.
 
 ## Git and commits
 
+- Create a pull request only when the user explicitly asks for one. Requests to
+  commit, push, or publish a branch do not implicitly authorize creating a pull
+  request, whether draft or ready for review.
 - Use the latest published Conventional Commits specification for every commit
   (currently Conventional Commits 1.0.0). If this guidance conflicts with a
   newer published version of the specification, follow the newer version.
