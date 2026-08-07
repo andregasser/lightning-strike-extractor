@@ -81,6 +81,12 @@ def _parser() -> argparse.ArgumentParser:
     review.add_argument("--config", type=Path, help="TOML selection configuration")
     review.add_argument("--labels", type=Path, help="Review JSON output path")
     review.add_argument(
+        "--scope",
+        choices=("selected", "all-events"),
+        default="selected",
+        help="Review exported selections or the best frame from every raw event",
+    )
+    review.add_argument(
         "--no-open",
         action="store_true",
         help="Print preview paths without opening the system image viewer",
@@ -241,6 +247,7 @@ def _review(args: argparse.Namespace) -> int:
         labels_path=args.labels,
         open_previews=not args.no_open,
         include_reviewed=args.include_reviewed,
+        scope=args.scope,
     )
     print(
         f"labels: {labels}\n"

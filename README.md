@@ -164,6 +164,8 @@ runs/
 │       ├── inputs.json      # resolved, reproducible input set
 │       ├── summary.json
 │       └── summary.csv
+├── labels/
+│   └── review.json       # atomic manual-review decisions
 └── videos/
     └── storm-a84f29c1-2bb55de739/
         ├── run.json         # status, phase, identity, timestamps, errors
@@ -212,6 +214,13 @@ Label the currently selected channel candidates after an analysis:
 uv run lightning review runs
 ```
 
+Audit recall by reviewing the strongest proposed frame from every raw flash
+event, including events rejected by the export filter:
+
+```bash
+uv run lightning review runs --scope all-events
+```
+
 For each event, the command creates a five-frame strip from two frames before
 the selected peak through two frames after it, opens the strip in the system
 image viewer, and prompts for a label:
@@ -221,13 +230,15 @@ Lightning channel? [y]es/[n]o/[u]ncertain/[q]uit:
 ```
 
 Each answer is written atomically to `runs/labels/review.json`. Re-running the
-command skips completed items and continues with the first pending event. Use
+command skips completed items whose reviewed frame is unchanged and continues
+with the first pending event. If another scope proposes a different winner for
+an event, that event is automatically presented again. Use
 `--include-reviewed` to revisit existing labels, `--labels /private/path.json`
 to choose another label file, or `--no-open` when preview paths should only be
 printed. Review data and previews live below ignored run directories and are
 never committed automatically.
 
-## Released object detector
+## Fixed object-detector runtime
 
 Install the optional detector dependencies without changing the lightweight core installation:
 

@@ -52,7 +52,39 @@ def _video_runs(path: Path) -> list[Path]:
     raise ValueError(f"No analysis video runs found below: {path}")
 
 
-def discover_review_items(path: Path, config: Config) -> list[ReviewItem]:
+def _all_event_candidates(
+    candidates: list[CandidateFrame], config: Config
+) -> list[CandidateFrame]:
+    events: dict[str, list[CandidateFrame]] = {}
+    for candidate in candidates:
+        events.setdefault(candidate.event_id, []).append(candidate)
+    selected = {
+        candidate.event_id: candidate
+        for candidate in select_export_candidates(candidates, config)
+    }
+    winners: list[CandidateFrame] = []
+    for event_id, rows in events.items():
+        winner = selected.get(event_id) or max(
+            rows,
+            key=lambda row: (
+                row.frame_quality or row.geometry_score,
+                row.multiframe_support,
+                row.geometry_score,
+            ),
+        )
+        winners.append(winner)
+    winners.sort(
+        key=lambda row: row.multiframe_quality or row.frame_quality or row.geometry_score,
+        reverse=True,
+    )
+    return winners
+
+
+def discover_review_items(
+    path: Path, config: Config, scope: str = "selected"
+) -> list[ReviewItem]:
+    if scope not in {"selected", "all-events"}:
+        raise ValueError(f"Unknown review scope: {scope}")
     items: list[ReviewItem] = []
     for video_run in _video_runs(path):
         source_path = video_run / "source.json"
@@ -68,7 +100,12 @@ def discover_review_items(path: Path, config: Config) -> list[ReviewItem]:
                 (video_run / "results" / "candidates.json").read_text()
             )
         ]
-        for candidate in select_export_candidates(candidates, config):
+        selected = (
+            select_export_candidates(candidates, config)
+            if scope == "selected"
+            else _all_event_candidates(candidates, config)
+        )
+        for candidate in selected:
             key = f"{video_run.name}:{candidate.event_id}"
             items.append(
                 ReviewItem(
@@ -148,6 +185,7 @@ def review_candidates(
     labels_path: Path | None = None,
     open_previews: bool = True,
     include_reviewed: bool = False,
+    scope: str = "selected",
     input_func: Callable[[str], str] = input,
     opener: Callable[[str], object] = webbrowser.open,
 ) -> tuple[Path, dict[str, int]]:
@@ -161,8 +199,13 @@ def review_candidates(
     labels = document.setdefault("items", {})
     if not isinstance(labels, dict):
         raise TypeError(f"Invalid review labels: {labels_path}")
-    items = discover_review_items(root, config)
-    pending = items if include_reviewed else [item for item in items if item.key not in labels]
+    items = discover_review_items(root, config, scope)
+
+    def is_current(item: ReviewItem) -> bool:
+        value = labels.get(item.key)
+        return isinstance(value, dict) and value.get("frame_number") == item.candidate.frame_number
+
+    pending = items if include_reviewed else [item for item in items if not is_current(item)]
     for index, item in enumerate(pending, 1):
         preview = build_review_preview(item)
         print(
@@ -186,6 +229,7 @@ def review_candidates(
             "time": item.candidate.time,
             "rank": item.candidate.rank,
             "label": LABELS[answer],
+            "scope": scope,
             "reviewed_at": _utc_now(),
             "preview": str(preview.resolve()),
             "metrics": asdict(item.candidate),
@@ -199,7 +243,7 @@ def review_candidates(
         )
         for label in LABELS.values()
     }
-    counts["pending"] = sum(item.key not in labels for item in items)
+    counts["pending"] = sum(not is_current(item) for item in items)
     document["updated_at"] = _utc_now()
     _atomic_json(labels_path, document)
     return labels_path, counts

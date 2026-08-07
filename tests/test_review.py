@@ -10,7 +10,7 @@ import numpy as np
 
 from lightning_extractor.config import Config
 from lightning_extractor.models import CandidateFrame
-from lightning_extractor.review import review_candidates
+from lightning_extractor.review import discover_review_items, review_candidates
 
 
 class ReviewTests(unittest.TestCase):
@@ -50,6 +50,21 @@ class ReviewTests(unittest.TestCase):
                     frame_quality=1000.0 - rank,
                 ).as_dict()
             )
+        candidates.append(
+            CandidateFrame(
+                3,
+                "evt_000003",
+                9,
+                0.9,
+                1.0,
+                0,
+                500_000.0,
+                channel_length=10.0,
+                channel_strength=5.0,
+                channel_thickness=5.0,
+                frame_quality=10.0,
+            ).as_dict()
+        )
         (results / "candidates.json").write_text(json.dumps(candidates))
         return run
 
@@ -105,6 +120,21 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(result, labels)
             self.assertEqual(counts["uncertain"], 2)
             self.assertEqual(counts["pending"], 0)
+
+    def test_all_events_scope_includes_rejected_events(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.create_run(root)
+
+            selected = discover_review_items(root, Config())
+            all_events = discover_review_items(root, Config(), "all-events")
+
+            self.assertEqual(len(selected), 2)
+            self.assertEqual(len(all_events), 3)
+            self.assertEqual(
+                {item.candidate.event_id for item in all_events},
+                {"evt_000001", "evt_000002", "evt_000003"},
+            )
 
 
 if __name__ == "__main__":
