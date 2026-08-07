@@ -266,6 +266,18 @@ uv run python -m tools.model_development.validate_coco \
 Annotation, validation and training helpers live below `tools/model_development/`; they are not
 part of the installed `lightning` CLI or runtime contract.
 
+Create an initial COCO file of unverified box proposals from a recursively scanned image root:
+
+```bash
+uv run python -m tools.model_development.preannotate_coco \
+  dataset/images --output dataset/annotations/proposals.json
+```
+
+Put each source video below its own first-level directory, for example
+`dataset/images/storm-a/frame-001.jpg`. The proposal file records that directory as `source_id` and
+marks every generated annotation as `verified: false`; proposals must be manually corrected before
+they become training labels.
+
 Keep frames from the same source video in one split. Randomly distributing adjacent frames across
 training and validation would produce misleadingly strong validation results.
 

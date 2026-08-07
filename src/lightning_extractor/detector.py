@@ -97,55 +97,67 @@ def _choose_device(torch: Any) -> str:
     return "cpu"
 
 
-def detect_image(image_path: Path) -> DetectionResult:
-    if not image_path.is_file():
-        raise ValueError(f"Image does not exist: {image_path}")
+class LightningDetector:
+    """Reusable inference session for the single released detector manifest."""
 
-    manifest = load_model_manifest()
-    torch, Image, classes = _detector_imports()
-    model_class, processor_class = classes
-    device = _choose_device(torch)
-    image = Image.open(image_path).convert("RGB")
-    processor = processor_class.from_pretrained(
-        manifest.artifact,
-        revision=manifest.revision,
-    )
-    model = model_class.from_pretrained(
-        manifest.artifact,
-        revision=manifest.revision,
-    ).to(device)
-    model.eval()
-    inputs = processor(images=image, text=manifest.prompt, return_tensors="pt").to(device)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    processed = processor.post_process_grounded_object_detection(
-        outputs,
-        inputs.input_ids,
-        threshold=manifest.confidence_threshold,
-        text_threshold=manifest.text_threshold,
-        target_sizes=[(image.height, image.width)],
-    )[0]
-    detections = tuple(
-        sorted(
-            (
-                Detection(
-                    label=manifest.class_name,
-                    score=float(score.item()),
-                    box=tuple(float(value) for value in box.tolist()),
-                )
-                for box, score in zip(processed["boxes"], processed["scores"])
-            ),
-            key=lambda item: item.score,
-            reverse=True,
+    def __init__(self) -> None:
+        self.manifest = load_model_manifest()
+        self.torch, self.Image, classes = _detector_imports()
+        model_class, processor_class = classes
+        self.device = _choose_device(self.torch)
+        self.processor = processor_class.from_pretrained(
+            self.manifest.artifact,
+            revision=self.manifest.revision,
         )
-    )
-    return DetectionResult(
-        image=image_path,
-        width=image.width,
-        height=image.height,
-        model=manifest,
-        detections=detections,
-    )
+        self.model = model_class.from_pretrained(
+            self.manifest.artifact,
+            revision=self.manifest.revision,
+        ).to(self.device)
+        self.model.eval()
+
+    def detect(self, image_path: Path) -> DetectionResult:
+        if not image_path.is_file():
+            raise ValueError(f"Image does not exist: {image_path}")
+        image = self.Image.open(image_path).convert("RGB")
+        inputs = self.processor(
+            images=image,
+            text=self.manifest.prompt,
+            return_tensors="pt",
+        ).to(self.device)
+        with self.torch.no_grad():
+            outputs = self.model(**inputs)
+        processed = self.processor.post_process_grounded_object_detection(
+            outputs,
+            inputs.input_ids,
+            threshold=self.manifest.confidence_threshold,
+            text_threshold=self.manifest.text_threshold,
+            target_sizes=[(image.height, image.width)],
+        )[0]
+        detections = tuple(
+            sorted(
+                (
+                    Detection(
+                        label=self.manifest.class_name,
+                        score=float(score.item()),
+                        box=tuple(float(value) for value in box.tolist()),
+                    )
+                    for box, score in zip(processed["boxes"], processed["scores"])
+                ),
+                key=lambda item: item.score,
+                reverse=True,
+            )
+        )
+        return DetectionResult(
+            image=image_path,
+            width=image.width,
+            height=image.height,
+            model=self.manifest,
+            detections=detections,
+        )
+
+
+def detect_image(image_path: Path) -> DetectionResult:
+    return LightningDetector().detect(image_path)
 
 
 def write_detection_json(path: Path, result: DetectionResult) -> None:

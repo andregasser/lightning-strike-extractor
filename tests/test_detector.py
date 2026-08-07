@@ -11,6 +11,7 @@ from lightning_extractor.detector import (
     load_model_manifest,
     write_detection_json,
 )
+from tools.model_development.preannotate_coco import preannotate
 from tools.model_development.validate_coco import validate_coco_dataset
 
 
@@ -47,6 +48,37 @@ class DetectorRuntimeTests(unittest.TestCase):
 
 
 class DinoDatasetDevelopmentTests(unittest.TestCase):
+    def test_preannotations_include_source_and_unverified_score(self) -> None:
+        class FakeDetector:
+            manifest = load_model_manifest()
+
+            def detect(self, image: Path) -> DetectionResult:
+                return DetectionResult(
+                    image=image,
+                    width=100,
+                    height=80,
+                    model=self.manifest,
+                    detections=(
+                        Detection("lightning_channel", 0.6, (10.0, 5.0, 30.0, 65.0)),
+                    ),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            images = root / "images"
+            source = images / "storm-a"
+            source.mkdir(parents=True)
+            (source / "frame.jpg").touch()
+            output = root / "annotations.json"
+
+            document = preannotate(images, output, detector=FakeDetector())
+
+            self.assertEqual(document["images"][0]["source_id"], "storm-a")
+            annotation = document["annotations"][0]
+            self.assertEqual(annotation["bbox"], [10.0, 5.0, 20.0, 60.0])
+            self.assertFalse(annotation["attributes"]["verified"])
+            self.assertEqual(annotation["attributes"]["proposal_score"], 0.6)
+
     def test_validates_positive_and_negative_coco_images(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
