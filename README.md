@@ -373,9 +373,46 @@ uv run python -m tools.model_development.package_cvat_dataset dataset \
   --output dataset/cvat/import.zip
 ```
 
+Label Studio is supported as an alternative review interface. Export its JSON prediction tasks,
+label configuration, and locally served image directory with:
+
+```bash
+uv run python -m tools.model_development.export_label_studio dataset \
+  --output label-studio-dataset
+```
+
+Start a local image server from another terminal:
+
+```bash
+uv run python -m tools.model_development.serve_label_studio \
+  label-studio-dataset/serve
+```
+
+Create a Label Studio project using `label-studio-dataset/project/label-config.xml`, then import
+`label-studio-dataset/import/tasks.json`. The `import/` directory deliberately contains no images;
+do not upload `serve/` through the Label Studio import dialog. The default task URLs point to
+`http://localhost:8001/images`; use `--image-base-url` when Label Studio must reach the images at a
+different HTTP or HTTPS address. Keep the image server running while labeling. Imported boxes are
+model predictions, not verified annotations, and must all be reviewed.
+
+Export completed work from Label Studio as full `JSON`—not `JSON_MIN`, COCO, or CSV—and convert the
+human annotations to verified, source-grouped COCO splits:
+
+```bash
+uv run python -m tools.model_development.import_label_studio_dataset \
+  label-studio-export.json \
+  --images dataset/images \
+  --output verified-dataset
+```
+
+The importer requires exactly one completed, non-cancelled annotation per task. An empty human
+annotation is preserved as a verified negative image; model predictions stored alongside it are
+never promoted to ground truth. Rectangle percentages are converted back to pixel coordinates and
+validated against the original image dimensions before the atomic split output is published.
+
 Keep frames from the same source video in one split. Randomly distributing adjacent frames across
 training, validation, and test sets would produce misleadingly strong evaluation results. The
-source ID is preserved in the CVAT image filename for this purpose.
+source ID is preserved in the CVAT and Label Studio handoffs for this purpose.
 
 Training is not implemented yet. The current development pipeline ends with a manually corrected,
 validated, and source-grouped COCO dataset.

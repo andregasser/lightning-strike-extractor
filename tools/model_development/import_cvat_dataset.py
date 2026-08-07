@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import tempfile
 import zipfile
@@ -15,9 +14,12 @@ from typing import Any
 import cv2
 import numpy as np
 
+from tools.model_development.dataset_splits import (
+    SPLITS,
+    assign_sources_to_splits,
+    validate_split_ratios,
+)
 from tools.model_development.validate_coco import validate_coco_dataset
-
-SPLITS = ("train", "validation", "test")
 
 
 def _sha256(path: Path) -> str:
@@ -37,43 +39,6 @@ def _source_id(image: dict[str, Any]) -> str:
     if explicit is not None and explicit != source:
         raise ValueError(f"CVAT image has conflicting source identities: {filename}")
     return source
-
-
-def _split_sources(
-    image_counts: dict[str, int], ratios: dict[str, float]
-) -> dict[str, str]:
-    active = [name for name in SPLITS if ratios[name] > 0]
-    if not active:
-        raise ValueError("At least one split ratio must be positive")
-    total = sum(image_counts.values())
-    targets = {name: total * ratios[name] for name in active}
-    assigned_counts = {name: 0 for name in active}
-    assignments: dict[str, str] = {}
-    ordered = sorted(image_counts, key=lambda source: (-image_counts[source], source))
-    for index, source in enumerate(ordered):
-        empty = [name for name in active if assigned_counts[name] == 0]
-        remaining = len(ordered) - index
-        eligible = empty if empty and remaining <= len(empty) else active
-        split = max(
-            eligible,
-            key=lambda name: (
-                targets[name] - assigned_counts[name],
-                ratios[name],
-                -active.index(name),
-            ),
-        )
-        assignments[source] = split
-        assigned_counts[split] += image_counts[source]
-    return assignments
-
-
-def _validate_ratios(train: float, validation: float, test: float) -> dict[str, float]:
-    ratios = {"train": train, "validation": validation, "test": test}
-    if any(not math.isfinite(value) or value < 0 for value in ratios.values()):
-        raise ValueError("Split ratios must be finite and non-negative")
-    if abs(sum(ratios.values()) - 1.0) > 1e-9:
-        raise ValueError("Split ratios must sum to 1.0")
-    return ratios
 
 
 def _validated_image(payload: bytes, image: dict[str, Any]) -> None:
@@ -117,7 +82,7 @@ def import_cvat_dataset(
         raise ValueError(f"CVAT archive does not exist: {archive_path}")
     if output.exists():
         raise ValueError(f"Refusing to overwrite imported dataset: {output}")
-    ratios = _validate_ratios(train_ratio, validation_ratio, test_ratio)
+    ratios = validate_split_ratios(train_ratio, validation_ratio, test_ratio)
 
     with zipfile.ZipFile(archive_path) as archive:
         members = archive.namelist()
@@ -168,7 +133,7 @@ def import_cvat_dataset(
             archive_members[image_id] = member
             source_counts[source] += 1
 
-        assignments = _split_sources(dict(source_counts), ratios)
+        assignments = assign_sources_to_splits(dict(source_counts), ratios)
         annotations_by_image: dict[int, list[dict[str, Any]]] = defaultdict(list)
         for annotation in annotations:
             if not isinstance(annotation, dict):
