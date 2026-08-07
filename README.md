@@ -310,6 +310,38 @@ CVAT may choose a subset name other than `default`; in that case use the corresp
 `instances_<subset>.json` and `images/<subset>` paths. Never train directly from the unverified
 proposal file.
 
+After that validation, import the manually corrected archive and create deterministic,
+source-grouped splits:
+
+```bash
+uv run python -m tools.model_development.import_cvat_dataset \
+  corrected-coco.zip \
+  --output verified-dataset
+```
+
+The importer requires exactly one COCO instances subset and the `lightning_channel` category. It
+recovers each source ID from the CVAT filename, rejects missing or ambiguous source identity, marks
+the corrected annotations as verified, and atomically writes:
+
+```text
+verified-dataset/
+├── manifest.json
+├── annotations/
+│   ├── instances_train.json
+│   ├── instances_validation.json
+│   └── instances_test.json
+└── images/
+    ├── train/
+    ├── validation/
+    └── test/
+```
+
+Default ratios are 70% training, 20% validation, and 10% test by image count. Whole source videos
+are assigned to one split, so the exact ratios are approximate—especially with only a few source
+videos. Override them with `--train-ratio`, `--validation-ratio`, and `--test-ratio`; the three
+values must sum to `1.0`. Only run this command after completing the manual CVAT review because all
+imported annotations are treated as verified.
+
 Export event peaks and nearby context frames from completed analysis runs:
 
 ```bash
@@ -345,8 +377,8 @@ Keep frames from the same source video in one split. Randomly distributing adjac
 training, validation, and test sets would produce misleadingly strong evaluation results. The
 source ID is preserved in the CVAT image filename for this purpose.
 
-Training and automatic source-grouped splitting are not implemented yet. The current development
-pipeline ends with a manually corrected and validated COCO dataset.
+Training is not implemented yet. The current development pipeline ends with a manually corrected,
+validated, and source-grouped COCO dataset.
 
 ## Batch manifests
 
