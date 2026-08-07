@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 .analysis_deps/
 .private/
+/artifacts/
 
 # Large source media and generated artifacts
 data/inbox/*
@@ -11,6 +12,8 @@ data/inbox/*
 /runs/
 /runs-*/
 /calibration-runs*/
+/dataset/
+# Historical locations retained so generated data cannot drift back into root.
 analysis/
 output/
 previews/

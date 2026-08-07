@@ -588,9 +588,15 @@ uv run python -m unittest discover -s tests -v
 uv run ruff check .
 ```
 
-The root-level Python scripts are the original research prototype. Production
-code lives in [`src/lightning_extractor`](src/lightning_extractor), and project
-conventions are documented in [`AGENTS.md`](AGENTS.md).
+Production code lives in [`src/lightning_extractor`](src/lightning_extractor),
+model-development utilities in [`tools/model_development`](tools/model_development),
+and the original research scripts in [`legacy/prototypes`](legacy/prototypes).
+Project conventions are documented in [`AGENTS.md`](AGENTS.md).
+
+Generated data stays out of the source tree: current analyses use ignored
+`runs/`, training exports use ignored `dataset/`, and historical local results
+are consolidated below ignored `artifacts/archive/`. The archive is local and
+reversible; it is not part of the repository or production source code.
 
 ## Roadmap
 

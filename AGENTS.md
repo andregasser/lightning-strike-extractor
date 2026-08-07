@@ -15,11 +15,12 @@ exports reviewable stills and machine-readable results.
   `lightning` through `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
 - Tests live in `tests/` and use the standard-library `unittest` runner.
-- Root-level Python scripts are the original research prototype. Preserve them
-  as reference material unless a task explicitly asks to migrate or remove
-  them.
-- `analysis/`, `output/`, and `previews/` contain legacy generated artifacts and
-  are not production source code.
+- Original research scripts live in `legacy/prototypes/`. Preserve them as
+  reference material unless a task explicitly asks to migrate or remove them;
+  new production behavior must not be added there.
+- Historical generated artifacts and superseded run directories are archived
+  locally below ignored `artifacts/archive/`. They are not production source
+  code and must never be committed.
 
 ## Inputs and outputs
 
