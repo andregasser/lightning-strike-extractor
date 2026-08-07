@@ -11,6 +11,7 @@ from .batch import VideoJob, deduplicate_jobs, list_runs, load_manifest, run_bat
 from .config import load_config
 from .discovery import DiscoveryResult, discover_inputs
 from .probe import ProbeError, probe_video
+from .review import review_candidates
 
 
 def _add_discovery_options(parser: argparse.ArgumentParser) -> None:
@@ -73,6 +74,21 @@ def _parser() -> argparse.ArgumentParser:
     run_list.add_argument("--json", action="store_true")
     run_show = run_commands.add_parser("show", help="Show a run or batch JSON state")
     run_show.add_argument("path", type=Path)
+
+    review = commands.add_parser("review", help="Manually label detected lightning channels")
+    review.add_argument("path", type=Path, help="Runs root or one video run")
+    review.add_argument("--config", type=Path, help="TOML selection configuration")
+    review.add_argument("--labels", type=Path, help="Review JSON output path")
+    review.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Print preview paths without opening the system image viewer",
+    )
+    review.add_argument(
+        "--include-reviewed",
+        action="store_true",
+        help="Review and overwrite already labelled events",
+    )
     return parser
 
 
@@ -210,6 +226,24 @@ def _runs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _review(args: argparse.Namespace) -> int:
+    labels, counts = review_candidates(
+        args.path,
+        load_config(args.config),
+        labels_path=args.labels,
+        open_previews=not args.no_open,
+        include_reviewed=args.include_reviewed,
+    )
+    print(
+        f"labels: {labels}\n"
+        f"lightning: {counts['lightning']}\n"
+        f"not-lightning: {counts['not-lightning']}\n"
+        f"uncertain: {counts['uncertain']}\n"
+        f"pending: {counts['pending']}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -217,14 +251,16 @@ def main(argv: list[str] | None = None) -> int:
             return _inspect(args)
         if args.command == "runs":
             return _runs(args)
+        if args.command == "review":
+            return _review(args)
         return _analyze(args)
     except KeyboardInterrupt:
-        print("analysis interrupted; rerun the batch with --resume", file=sys.stderr)
+        print("interrupted; progress written so far can be resumed", file=sys.stderr)
         return 130
     except ProbeError as error:
         print(f"error: {error}", file=sys.stderr)
         return 4 if "ffprobe" in str(error).lower() else 2
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, TypeError, ValueError, RuntimeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 5 if "disk space" in str(error).lower() else 2
 

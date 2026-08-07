@@ -5,6 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from lightning_extractor.cli import main
 
@@ -27,6 +28,24 @@ class CliTests(unittest.TestCase):
             with redirect_stdout(StringIO()):
                 exit_code = main(["analyze", directory, "--dry-run"])
             self.assertEqual(exit_code, 3)
+
+    def test_review_command_reports_label_counts(self) -> None:
+        counts = {
+            "lightning": 2,
+            "not-lightning": 1,
+            "uncertain": 0,
+            "pending": 3,
+        }
+        output = StringIO()
+        with (
+            patch("lightning_extractor.cli.review_candidates", return_value=(Path("labels.json"), counts)),
+            redirect_stdout(output),
+        ):
+            exit_code = main(["review", "runs", "--no-open"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("lightning: 2", output.getvalue())
+        self.assertIn("pending: 3", output.getvalue())
 
 
 if __name__ == "__main__":
