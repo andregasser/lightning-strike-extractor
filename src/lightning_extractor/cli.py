@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .batch import VideoJob, deduplicate_jobs, list_runs, load_manifest, run_batch
 from .config import load_config
+from .detector import detect_image, render_detections, write_detection_json
 from .discovery import DiscoveryResult, discover_inputs
 from .probe import ProbeError, probe_video
 from .review import review_candidates
@@ -89,6 +90,13 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Review and overwrite already labelled events",
     )
+
+    detector = commands.add_parser("detector", help="Detect lightning with the released model")
+    detector_commands = detector.add_subparsers(dest="detector_command", required=True)
+    detect = detector_commands.add_parser("detect", help="Detect lightning in one image")
+    detect.add_argument("image", type=Path)
+    detect.add_argument("--output", type=Path, help="Write detection JSON")
+    detect.add_argument("--preview", type=Path, help="Write image with detection boxes")
     return parser
 
 
@@ -244,6 +252,16 @@ def _review(args: argparse.Namespace) -> int:
     return 0
 
 
+def _detector(args: argparse.Namespace) -> int:
+    result = detect_image(args.image)
+    if args.output:
+        write_detection_json(args.output, result)
+    if args.preview:
+        render_detections(args.image, args.preview, result.detections)
+    print(json.dumps(result.as_dict(), indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -253,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
             return _runs(args)
         if args.command == "review":
             return _review(args)
+        if args.command == "detector":
+            return _detector(args)
         return _analyze(args)
     except KeyboardInterrupt:
         print("interrupted; progress written so far can be resumed", file=sys.stderr)

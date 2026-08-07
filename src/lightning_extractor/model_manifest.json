@@ -1,0 +1,13 @@
+{
+  "name": "lightning-channel-detector-bootstrap",
+  "version": "0.1.0",
+  "release_status": "bootstrap",
+  "backend": "grounding_dino",
+  "artifact": "IDEA-Research/grounding-dino-tiny",
+  "revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+  "artifact_sha256": null,
+  "class_name": "lightning_channel",
+  "prompt": "a visible lightning bolt. a forked lightning channel.",
+  "confidence_threshold": 0.25,
+  "text_threshold": 0.25
+}

@@ -227,6 +227,48 @@ to choose another label file, or `--no-open` when preview paths should only be
 printed. Review data and previews live below ignored run directories and are
 never committed automatically.
 
+## Released object detector
+
+Install the optional detector dependencies without changing the lightweight core installation:
+
+```bash
+uv sync --extra detector --extra dev
+```
+
+Run the detector on an exported frame:
+
+```bash
+uv run lightning detector detect frame.jpg \
+  --output detections.json \
+  --preview detections.jpg
+```
+
+The runtime model, revision, class and validated confidence threshold are fixed by
+`src/lightning_extractor/model_manifest.json`. They are included in every JSON result. The product
+CLI intentionally provides no model, prompt, device, training or threshold controls, so the same
+release produces reproducible results.
+
+The current `0.1.0` manifest is explicitly marked `bootstrap`: it pins the Apache-2.0-licensed
+`IDEA-Research/grounding-dino-tiny` checkpoint for integration work, but it is not the final
+lightning-trained model. A production manifest will replace it only after the dedicated detector
+has passed the reference-video evaluation.
+
+Fine-tuning data uses standard COCO detection JSON. Each visible channel is one
+`lightning_channel` bounding box in `[x, y, width, height]` format. Images with no annotations are
+intentional negative examples. Validate an export from CVAT or another annotation tool before
+training:
+
+```bash
+uv run python -m tools.model_development.validate_coco \
+  annotations/train.json --images dataset/images
+```
+
+Annotation, validation and training helpers live below `tools/model_development/`; they are not
+part of the installed `lightning` CLI or runtime contract.
+
+Keep frames from the same source video in one split. Randomly distributing adjacent frames across
+training and validation would produce misleadingly strong validation results.
+
 ## Batch manifests
 
 For large or repeatable collections, use a TOML manifest:

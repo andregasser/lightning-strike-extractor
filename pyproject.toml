@@ -15,6 +15,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.9"]
+detector = [
+  "pillow>=10,<13",
+  "torch>=2.4,<3",
+  "transformers>=4.57,<6",
+]
 
 [project.scripts]
 lightning = "lightning_extractor.cli:main"
