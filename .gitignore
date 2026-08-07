@@ -8,9 +8,9 @@ __pycache__/
 # Large source media and generated artifacts
 data/inbox/*
 !data/inbox/.gitkeep
-runs/
-runs-v*/
-calibration-runs*/
+/runs/
+/runs-*/
+/calibration-runs*/
 analysis/
 output/
 previews/
