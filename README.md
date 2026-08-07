@@ -22,6 +22,12 @@ detecting sudden lightning flashes, and ranking the frames most likely to show
 a thin, visible lightning channel. It reads the original video in place and
 exports full-resolution stills alongside JSON and CSV results.
 
+The repository also contains an optional, fixed-configuration object-detector
+runtime and offline tools for exporting candidate frames, generating COCO box
+proposals, and handing annotation work to CVAT. The currently pinned detector
+checkpoint is a bootstrap model for dataset creation, not yet the final
+lightning-trained DINO model.
+
 Built for demanding footage such as **4K, 100 fps HEVC recordings**—without
 uploading the video or modifying the source file.
 
@@ -262,20 +268,47 @@ release produces reproducible results.
 The current `0.1.0` manifest is explicitly marked `bootstrap`: it pins the Apache-2.0-licensed
 `IDEA-Research/grounding-dino-tiny` checkpoint for integration work, but it is not the final
 lightning-trained model. A production manifest will replace it only after the dedicated detector
-has passed the reference-video evaluation.
+has passed the reference-video evaluation. The first detector invocation downloads the pinned
+checkpoint from Hugging Face; subsequent runs use the local model cache.
+
+The bootstrap detector is suitable for annotation proposals only. Its boxes are not ground truth,
+and its detections must not be treated as validated product results.
+
+## Building the training dataset
 
 Fine-tuning data uses standard COCO detection JSON. Each visible channel is one
 `lightning_channel` bounding box in `[x, y, width, height]` format. Images with no annotations are
-intentional negative examples. Validate an export from CVAT or another annotation tool before
-training:
-
-```bash
-uv run python -m tools.model_development.validate_coco \
-  annotations/train.json --images dataset/images
-```
+intentional negative examples.
 
 Annotation, validation and training helpers live below `tools/model_development/`; they are not
 part of the installed `lightning` CLI or runtime contract.
+
+Run the complete atomic preparation workflow with the fixed proposal model:
+
+```bash
+uv run python -m tools.model_development.prepare_training_dataset runs \
+  --output dataset
+```
+
+This produces `manifest.json`, exported images, unverified COCO proposals in
+`annotations/proposals.json`, a validated `preparation.json` summary, and the ready-to-upload
+`cvat/import.zip`. The output directory is published only after every step succeeds.
+
+In CVAT, create a project or task by importing `cvat/import.zip` as `COCO 1.0`. Review every
+`lightning_channel` box, delete false proposals, add missing channels, and leave true negative
+images without a box. Export the corrected task again as `COCO 1.0` with images, then validate the
+exported archive before training:
+
+```bash
+unzip corrected-coco.zip -d corrected-coco
+uv run python -m tools.model_development.validate_coco \
+  corrected-coco/annotations/instances_default.json \
+  --images corrected-coco/images/default
+```
+
+CVAT may choose a subset name other than `default`; in that case use the corresponding
+`instances_<subset>.json` and `images/<subset>` paths. Never train directly from the unverified
+proposal file.
 
 Export event peaks and nearby context frames from completed analysis runs:
 
@@ -301,8 +334,19 @@ Put each source video below its own first-level directory, for example
 marks every generated annotation as `verified: false`; proposals must be manually corrected before
 they become training labels.
 
+Package an already prepared dataset separately when needed:
+
+```bash
+uv run python -m tools.model_development.package_cvat_dataset dataset \
+  --output dataset/cvat/import.zip
+```
+
 Keep frames from the same source video in one split. Randomly distributing adjacent frames across
-training and validation would produce misleadingly strong validation results.
+training, validation, and test sets would produce misleadingly strong evaluation results. The
+source ID is preserved in the CVAT image filename for this purpose.
+
+Training and automatic source-grouped splitting are not implemented yet. The current development
+pipeline ends with a manually corrected and validated COCO dataset.
 
 ## Batch manifests
 
@@ -381,9 +425,16 @@ Defaults live in [`config/default.toml`](config/default.toml):
 width = 960
 baseline_seconds = 0.30
 event_gap_seconds = 0.75
+event_window_before = 0.40
+event_window_after = 0.40
 rise_percentile = 0.995
 diff_percentile = 0.995
+minimum_rise = 1.0
+minimum_difference = 0.8
+minimum_high_rise = 3.0
+max_events = 0
 keep_frames_per_event = 0
+checkpoint_seconds = 30.0
 
 [channel]
 analysis_width = 1920
@@ -408,6 +459,10 @@ multiframe_dilation_pixels = 3
 multiframe_bonus_weight = 0.25
 multiframe_template_min_support = 0.5
 multiframe_peak_radius_frames = 2
+ridge_threshold = 10
+bright_area_threshold = 20
+minimum_line_length = 12
+maximum_line_gap = 8
 
 [export]
 top = 50
@@ -613,7 +668,8 @@ reversible; it is not part of the repository or production source code.
 
 The public, continuously maintained roadmap lives in [`TODO.md`](TODO.md).
 Current priorities are full-length validation on real footage, an interactive
-review workflow, and exports for accepted stills and clips.
+annotation pass in CVAT, source-grouped dataset splits, DINO training and evaluation, and replacing
+the bootstrap manifest with a validated production checkpoint.
 
 ## Contributing
 

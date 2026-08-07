@@ -4,13 +4,16 @@ import json
 import shutil
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 import cv2
 import numpy as np
 
+from lightning_extractor.detector import Detection, DetectionResult, load_model_manifest
 from lightning_extractor.models import CandidateFrame
 from tools.model_development.export_training_frames import export_training_frames
+from tools.model_development.prepare_training_dataset import prepare_training_dataset
 
 
 class TrainingDatasetExportTests(unittest.TestCase):
@@ -145,6 +148,71 @@ class TrainingDatasetExportTests(unittest.TestCase):
 
             self.assertEqual(len(manifest["frames"]), 2)
             self.assertEqual(manifest["sources"][0]["out_of_range_frames_skipped"], 1)
+
+    def test_prepares_and_validates_dataset_atomically(self) -> None:
+        class FakeDetector:
+            manifest = load_model_manifest()
+
+            def detect(self, image: Path) -> DetectionResult:
+                return DetectionResult(
+                    image=image,
+                    width=64,
+                    height=48,
+                    model=self.manifest,
+                    detections=(
+                        Detection("lightning_channel", 0.8, (10.0, 5.0, 30.0, 40.0)),
+                    ),
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.create_run(root)
+            output = root / "dataset"
+
+            report = prepare_training_dataset(
+                root,
+                output,
+                max_events_per_video=1,
+                context_frames=0,
+                detector=FakeDetector(),
+            )
+
+            self.assertEqual(report["sources"], 1)
+            self.assertEqual(report["frames"], 1)
+            self.assertEqual(report["validation"]["annotations"], 1)
+            self.assertEqual(report["validation"]["negative_images"], 0)
+            self.assertTrue((output / "manifest.json").is_file())
+            self.assertTrue((output / "annotations" / "proposals.json").is_file())
+            self.assertTrue((output / "preparation.json").is_file())
+            cvat_archive = output / "cvat" / "import.zip"
+            self.assertTrue(cvat_archive.is_file())
+            with zipfile.ZipFile(cvat_archive) as archive:
+                names = archive.namelist()
+                self.assertIn("annotations/instances_default.json", names)
+                image_name = next(name for name in names if name.startswith("images/default/"))
+                self.assertIn("source123__", image_name)
+                cvat_annotations = json.loads(
+                    archive.read("annotations/instances_default.json")
+                )
+                self.assertTrue(cvat_annotations["images"][0]["file_name"].startswith("source123__"))
+                self.assertEqual(cvat_annotations["annotations"][0]["segmentation"], [])
+
+    def test_failed_preannotation_does_not_publish_partial_dataset(self) -> None:
+        class FailingDetector:
+            manifest = load_model_manifest()
+
+            def detect(self, image: Path) -> DetectionResult:
+                raise RuntimeError("inference failed")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.create_run(root)
+            output = root / "dataset"
+
+            with self.assertRaisesRegex(RuntimeError, "inference failed"):
+                prepare_training_dataset(root, output, detector=FailingDetector())
+
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

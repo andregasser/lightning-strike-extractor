@@ -58,6 +58,7 @@ def preannotate(root: Path, output: Path, *, detector: LightningDetector | None 
                     "category_id": 1,
                     "bbox": [x0, y0, width, height],
                     "area": width * height,
+                    "segmentation": [],
                     "iscrowd": 0,
                     "attributes": {
                         "proposal_score": detection.score,

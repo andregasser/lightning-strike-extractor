@@ -76,6 +76,7 @@ class DinoDatasetDevelopmentTests(unittest.TestCase):
             self.assertEqual(document["images"][0]["source_id"], "storm-a")
             annotation = document["annotations"][0]
             self.assertEqual(annotation["bbox"], [10.0, 5.0, 20.0, 60.0])
+            self.assertEqual(annotation["segmentation"], [])
             self.assertFalse(annotation["attributes"]["verified"])
             self.assertEqual(annotation["attributes"]["proposal_score"], 0.6)
 
