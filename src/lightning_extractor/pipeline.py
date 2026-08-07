@@ -125,21 +125,31 @@ def _candidates_from_json(path: Path) -> list[CandidateFrame]:
 def select_export_candidates(
     candidates: list[CandidateFrame], config: Config
 ) -> list[CandidateFrame]:
-    def is_qualified(row: CandidateFrame) -> bool:
-        geometry_qualified = row.geometry_score >= config.export.minimum_geometry_score
-        own_mask_supported = (
-            row.geometry_score >= config.export.minimum_supported_geometry_score
-            and row.multiframe_support
-            >= config.export.minimum_low_geometry_multiframe_support
+    def has_confirmed_geometry(row: CandidateFrame) -> bool:
+        base_geometry = (
+            row.geometry_score >= config.export.minimum_geometry_score
+            and row.channel_length >= config.export.minimum_channel_length
+            and row.line_segments >= config.export.minimum_line_segments
+            and row.channel_strength >= config.export.minimum_channel_strength
+            and 0.0 < row.channel_thickness <= config.export.maximum_channel_thickness
         )
-        shared_template_supported = (
-            row.channel_template_frame_number >= 0
-            and row.channel_template_frame_number != row.frame_number
-            and row.peak_multiframe_support
-            >= config.export.minimum_low_geometry_multiframe_support
+        # A merely thresholded cloud edge can be thin and connected. Require
+        # additional evidence that the component is either geometrically very
+        # strong, genuinely long, or isolated from a diffuse frame-wide flash.
+        return base_geometry and (
+            row.geometry_score >= config.export.minimum_strong_geometry_score
+            or row.channel_length >= config.export.minimum_long_channel_length
+            or row.bright_area <= config.export.maximum_clean_channel_bright_area
         )
-        return row.channel_length >= config.export.minimum_channel_length and (
-            geometry_qualified or own_mask_supported or shared_template_supported
+
+    def is_qualified(row: CandidateFrame, confirmed_frames: set[int]) -> bool:
+        # A bright or saturated return stroke may use the mask of an adjacent
+        # frame, but temporal overlap alone must never manufacture geometry.
+        # The exact template frame therefore has to pass the same strict
+        # channel test on its own.
+        return has_confirmed_geometry(row) or (
+            row.channel_template_frame_number != row.frame_number
+            and row.channel_template_frame_number in confirmed_frames
         )
 
     if config.export.one_frame_per_event:
@@ -148,10 +158,13 @@ def select_export_candidates(
             events.setdefault(candidate.event_id, []).append(candidate)
         selected = []
         for rows in events.values():
+            confirmed_frames = {
+                row.frame_number for row in rows if has_confirmed_geometry(row)
+            }
             qualified_rows = [
                 row
                 for row in rows
-                if is_qualified(row)
+                if is_qualified(row, confirmed_frames)
             ]
             if not qualified_rows:
                 continue
@@ -181,8 +194,11 @@ def select_export_candidates(
         return selected[: config.export.top]
 
     selected: list[CandidateFrame] = []
+    confirmed_frames = {
+        row.frame_number for row in candidates if has_confirmed_geometry(row)
+    }
     for candidate in candidates:
-        if not is_qualified(candidate):
+        if not is_qualified(candidate, confirmed_frames):
             continue
         selected.append(candidate)
         if len(selected) >= config.export.top:

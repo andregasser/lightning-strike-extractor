@@ -43,10 +43,14 @@ maximum_line_gap = 8
 
 [export]
 top = 50
-minimum_geometry_score = 100.0
-minimum_supported_geometry_score = 25.0
-minimum_low_geometry_multiframe_support = 0.5
-minimum_channel_length = 40.0
+minimum_geometry_score = 50.0
+minimum_channel_length = 100.0
+minimum_line_segments = 3
+minimum_channel_strength = 15.0
+maximum_channel_thickness = 3.5
+minimum_strong_geometry_score = 500.0
+minimum_long_channel_length = 300.0
+maximum_clean_channel_bright_area = 5000.0
 one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.0
 jpeg_quality = 96

@@ -309,10 +309,14 @@ multiframe_peak_radius_frames = 2
 
 [export]
 top = 50
-minimum_geometry_score = 100.0
-minimum_supported_geometry_score = 25.0
-minimum_low_geometry_multiframe_support = 0.5
-minimum_channel_length = 40.0
+minimum_geometry_score = 50.0
+minimum_channel_length = 100.0
+minimum_line_segments = 3
+minimum_channel_strength = 15.0
+maximum_channel_thickness = 3.5
+minimum_strong_geometry_score = 500.0
+minimum_long_channel_length = 300.0
+maximum_clean_channel_bright_area = 5000.0
 one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.0
 jpeg_quality = 96
@@ -337,10 +341,13 @@ quadratically weighted original-frame luminance, connected branching, and
 clarity. Temporal response validates that a channel is new, but no longer acts
 as a proxy for its visible brightness. Thickness receives only a linear clarity
 penalty so that natural bloom around a powerful channel is not punished twice.
-A frame below the normal geometry threshold remains eligible only when it clears
-the lower safety floor and the same channel geometry has strong multi-frame
-support. This preserves bright, sky-illuminating peaks without admitting isolated
-motion artifacts.
+A channel must meet minimum length, line-segment, strength, and thickness
+requirements. It must additionally be geometrically strong, genuinely long, or
+cleanly isolated from a diffuse frame-wide brightening. Multi-frame overlap can
+no longer replace missing channel geometry. A bright or saturated peak remains
+eligible only when its exact adjacent template frame independently passes the
+same strict channel test. This preserves powerful sky-illuminating return
+strokes without promoting ordinary cloud illumination.
 A positive value restores an
 optional early per-event limit for faster exploratory runs.
 

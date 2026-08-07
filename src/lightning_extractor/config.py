@@ -55,10 +55,14 @@ class ChannelConfig:
 @dataclass(slots=True)
 class ExportConfig:
     top: int = 50
-    minimum_geometry_score: float = 100.0
-    minimum_supported_geometry_score: float = 25.0
-    minimum_low_geometry_multiframe_support: float = 0.5
-    minimum_channel_length: float = 40.0
+    minimum_geometry_score: float = 50.0
+    minimum_channel_length: float = 100.0
+    minimum_line_segments: int = 3
+    minimum_channel_strength: float = 15.0
+    maximum_channel_thickness: float = 3.5
+    minimum_strong_geometry_score: float = 500.0
+    minimum_long_channel_length: float = 300.0
+    maximum_clean_channel_bright_area: float = 5000.0
     one_frame_per_event: bool = True
     minimum_winner_geometry_ratio: float = 0.0
     jpeg_quality: int = 96
