@@ -266,6 +266,18 @@ uv run python -m tools.model_development.validate_coco \
 Annotation, validation and training helpers live below `tools/model_development/`; they are not
 part of the installed `lightning` CLI or runtime contract.
 
+Export event peaks and nearby context frames from completed analysis runs:
+
+```bash
+uv run python -m tools.model_development.export_training_frames runs \
+  --output dataset
+```
+
+The exporter processes each source sequentially, keeps at most 100 event winners per video by
+default, includes two adjacent frames on either side, deduplicates repeated absolute frames across
+analysis runs, and records source IDs, candidate metrics, review labels, roles, and SHA-256 image
+checksums in `dataset/manifest.json`. The generated `dataset/` directory is ignored by Git.
+
 Create an initial COCO file of unverified box proposals from a recursively scanned image root:
 
 ```bash
