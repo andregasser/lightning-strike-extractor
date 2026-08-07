@@ -122,6 +122,19 @@ def _candidates_from_json(path: Path) -> list[CandidateFrame]:
     return [CandidateFrame(**row) for row in _read_json(path)]  # type: ignore[arg-type]
 
 
+def has_visible_channel_peak(row: CandidateFrame, config: Config) -> bool:
+    clean_local_channel = (
+        row.channel_length >= config.export.minimum_channel_length
+        and row.line_segments >= config.export.minimum_clean_line_segments
+        and row.bright_area <= config.export.maximum_clean_channel_bright_area
+    )
+    return (
+        row.geometry_score >= config.export.minimum_peak_geometry_score
+        or row.channel_length >= config.export.minimum_peak_channel_length
+        or clean_local_channel
+    )
+
+
 def select_export_candidates(
     candidates: list[CandidateFrame], config: Config
 ) -> list[CandidateFrame]:
@@ -175,16 +188,16 @@ def select_export_candidates(
                 if row.geometry_score
                 >= best_geometry * config.export.minimum_winner_geometry_ratio
             ]
-            selected.append(
-                max(
-                    plausible,
-                    key=lambda row: (
-                        row.frame_quality or row.geometry_score,
-                        row.multiframe_support,
-                        row.geometry_score,
-                    ),
-                )
+            winner = max(
+                plausible,
+                key=lambda row: (
+                    row.frame_quality or row.geometry_score,
+                    row.multiframe_support,
+                    row.geometry_score,
+                ),
             )
+            if has_visible_channel_peak(winner, config):
+                selected.append(winner)
         selected.sort(
             key=lambda row: row.multiframe_quality
             or row.frame_quality
@@ -198,7 +211,9 @@ def select_export_candidates(
         row.frame_number for row in candidates if has_confirmed_geometry(row)
     }
     for candidate in candidates:
-        if not is_qualified(candidate, confirmed_frames):
+        if not is_qualified(candidate, confirmed_frames) or not has_visible_channel_peak(
+            candidate, config
+        ):
             continue
         selected.append(candidate)
         if len(selected) >= config.export.top:

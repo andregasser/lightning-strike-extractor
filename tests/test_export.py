@@ -8,7 +8,11 @@ import cv2
 
 from lightning_extractor.config import Config
 from lightning_extractor.models import CandidateFrame
-from lightning_extractor.pipeline import export_stills, select_export_candidates
+from lightning_extractor.pipeline import (
+    export_stills,
+    has_visible_channel_peak,
+    select_export_candidates,
+)
 
 
 def candidate(rank: int, event: str, score: float) -> CandidateFrame:
@@ -146,6 +150,19 @@ class ExportSelectionTests(unittest.TestCase):
 
         self.assertEqual(selected, [])
 
+    def test_confirmed_template_cannot_promote_cloud_only_peak(self) -> None:
+        config = Config()
+        peak = candidate(1, "event-a", 2.0)
+        peak.channel_length = 81.0
+        peak.bright_area = 1_691_865.0
+        peak.frame_quality = 1_000.0
+        template = candidate(2, "event-a", 600.0)
+        peak.channel_template_frame_number = template.frame_number
+
+        selected = select_export_candidates([peak, template], config)
+
+        self.assertEqual(selected, [])
+
     def test_component_without_line_segments_is_not_exported(self) -> None:
         config = Config()
         row = candidate(1, "event-a", 500.0)
@@ -174,6 +191,40 @@ class ExportSelectionTests(unittest.TestCase):
         selected = select_export_candidates([row], config)
 
         self.assertEqual(selected, [row])
+
+    def test_reviewed_false_positive_peaks_fail_visibility_gate(self) -> None:
+        config = Config()
+        labelled_negatives = (
+            (2.1, 81.0, 3, 1_691_865.0),
+            (23.4, 24.0, 0, 1_000.0),
+            (45.2, 174.0, 9, 70_077.0),
+            (45.4, 22.0, 0, 73_496.0),
+            (75.7, 127.0, 4, 1_000_000.0),
+            (130.1, 86.0, 3, 100_000.0),
+            (188.3, 109.0, 3, 237_533.0),
+        )
+        for geometry, length, segments, bright_area in labelled_negatives:
+            with self.subTest(geometry=geometry, length=length):
+                row = candidate(1, "event-a", geometry)
+                row.channel_length = length
+                row.line_segments = segments
+                row.bright_area = bright_area
+                self.assertFalse(has_visible_channel_peak(row, config))
+
+    def test_reviewed_positive_peak_boundaries_remain_visible(self) -> None:
+        config = Config()
+        labelled_positives = (
+            (1.3, 203.0, 4, 1_324_477.0),
+            (520.2, 145.0, 4, 44_126.0),
+            (816.3, 109.0, 4, 63_617.0),
+        )
+        for geometry, length, segments, bright_area in labelled_positives:
+            with self.subTest(geometry=geometry, length=length):
+                row = candidate(1, "event-a", geometry)
+                row.channel_length = length
+                row.line_segments = segments
+                row.bright_area = bright_area
+                self.assertTrue(has_visible_channel_peak(row, config))
 
     def test_winner_is_longest_clear_frame_within_plausible_geometry(self) -> None:
         config = Config()

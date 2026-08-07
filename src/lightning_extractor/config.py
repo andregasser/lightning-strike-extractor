@@ -63,6 +63,9 @@ class ExportConfig:
     minimum_strong_geometry_score: float = 500.0
     minimum_long_channel_length: float = 300.0
     maximum_clean_channel_bright_area: float = 5000.0
+    minimum_clean_line_segments: int = 5
+    minimum_peak_geometry_score: float = 500.0
+    minimum_peak_channel_length: float = 200.0
     one_frame_per_event: bool = True
     minimum_winner_geometry_ratio: float = 0.0
     jpeg_quality: int = 96

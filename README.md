@@ -178,6 +178,8 @@ runs/
         │   ├── candidates.json
         │   ├── candidates.csv
         │   └── summary.json
+        ├── review/
+        │   └── previews/   # generated five-frame manual-review strips
         └── exports/
             ├── contact-sheet.jpg
             ├── stills/
@@ -201,6 +203,29 @@ uv run lightning runs list
 uv run lightning runs list --status failed
 uv run lightning runs show runs/batches/batch-248f7728284d
 ```
+
+## Manual verification
+
+Label the currently selected channel candidates after an analysis:
+
+```bash
+uv run lightning review runs
+```
+
+For each event, the command creates a five-frame strip from two frames before
+the selected peak through two frames after it, opens the strip in the system
+image viewer, and prompts for a label:
+
+```text
+Lightning channel? [y]es/[n]o/[u]ncertain/[q]uit:
+```
+
+Each answer is written atomically to `runs/labels/review.json`. Re-running the
+command skips completed items and continues with the first pending event. Use
+`--include-reviewed` to revisit existing labels, `--labels /private/path.json`
+to choose another label file, or `--no-open` when preview paths should only be
+printed. Review data and previews live below ignored run directories and are
+never committed automatically.
 
 ## Batch manifests
 
@@ -317,6 +342,9 @@ maximum_channel_thickness = 3.5
 minimum_strong_geometry_score = 500.0
 minimum_long_channel_length = 300.0
 maximum_clean_channel_bright_area = 5000.0
+minimum_clean_line_segments = 5
+minimum_peak_geometry_score = 500.0
+minimum_peak_channel_length = 200.0
 one_frame_per_event = true
 minimum_winner_geometry_ratio = 0.0
 jpeg_quality = 96
@@ -347,7 +375,10 @@ cleanly isolated from a diffuse frame-wide brightening. Multi-frame overlap can
 no longer replace missing channel geometry. A bright or saturated peak remains
 eligible only when its exact adjacent template frame independently passes the
 same strict channel test. This preserves powerful sky-illuminating return
-strokes without promoting ordinary cloud illumination.
+strokes without promoting ordinary cloud illumination. The selected peak must
+also retain visible evidence of its own: a 200-pixel channel, a geometry score
+of 500, or a clean locally isolated channel. This prevents a valid neighbouring
+template from promoting a peak that contains only diffuse cloud light.
 A positive value restores an
 optional early per-event limit for faster exploratory runs.
 
