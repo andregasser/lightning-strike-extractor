@@ -16,8 +16,6 @@ from lightning_extractor.detector import (
     load_model_manifest,
     write_detection_json,
 )
-from tools.model_development.preannotate_coco import preannotate
-from tools.model_development.validate_coco import validate_coco_dataset
 
 
 class DetectorRuntimeTests(unittest.TestCase):
@@ -98,102 +96,6 @@ class DetectorRuntimeTests(unittest.TestCase):
             self.assertAlmostEqual(y0, 0.0)
             self.assertAlmostEqual(x1, 180.0)
             self.assertAlmostEqual(y1, 100.0)
-
-
-class AnnotationDatasetTests(unittest.TestCase):
-    def test_blank_annotation_tasks_need_no_product_detector(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            images = root / "images" / "storm-a"
-            images.mkdir(parents=True)
-            cv2.imwrite(str(images / "frame.jpg"), np.zeros((80, 100, 3), dtype=np.uint8))
-            document = preannotate(root / "images", root / "annotations.json")
-            self.assertEqual(len(document["images"]), 1)
-            self.assertEqual(document["annotations"], [])
-            self.assertEqual(document["info"]["proposal_model"]["backend"], "none")
-
-    def test_preannotations_include_source_and_unverified_score(self) -> None:
-        class FakeDetector:
-            manifest = load_model_manifest()
-
-            def detect(self, image: Path) -> DetectionResult:
-                return DetectionResult(
-                    image=image,
-                    width=100,
-                    height=80,
-                    model=self.manifest,
-                    detections=(
-                        Detection("lightning_channel", 0.6, (10.0, 5.0, 30.0, 65.0)),
-                    ),
-                )
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            images = root / "images"
-            source = images / "storm-a"
-            source.mkdir(parents=True)
-            (source / "frame.jpg").touch()
-            output = root / "annotations.json"
-
-            document = preannotate(images, output, detector=FakeDetector())
-
-            self.assertEqual(document["images"][0]["source_id"], "storm-a")
-            annotation = document["annotations"][0]
-            self.assertEqual(annotation["bbox"], [10.0, 5.0, 20.0, 60.0])
-            self.assertEqual(annotation["segmentation"], [])
-            self.assertFalse(annotation["attributes"]["verified"])
-            self.assertEqual(annotation["attributes"]["proposal_score"], 0.6)
-
-    def test_validates_positive_and_negative_coco_images(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "positive.jpg").touch()
-            (root / "negative.jpg").touch()
-            annotations = root / "annotations.json"
-            annotations.write_text(
-                json.dumps(
-                    {
-                        "images": [
-                            {"id": 1, "file_name": "positive.jpg", "width": 100, "height": 80},
-                            {"id": 2, "file_name": "negative.jpg", "width": 100, "height": 80},
-                        ],
-                        "categories": [{"id": 1, "name": "lightning_channel"}],
-                        "annotations": [
-                            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [10, 5, 20, 60]}
-                        ],
-                    }
-                )
-            )
-            self.assertEqual(
-                validate_coco_dataset(annotations, root),
-                {
-                    "images": 2,
-                    "annotations": 1,
-                    "categories": 1,
-                    "positive_images": 1,
-                    "negative_images": 1,
-                },
-            )
-
-    def test_rejects_box_outside_image(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "image.jpg").touch()
-            annotations = root / "annotations.json"
-            annotations.write_text(
-                json.dumps(
-                    {
-                        "images": [{"id": 1, "file_name": "image.jpg", "width": 10, "height": 10}],
-                        "categories": [{"id": 1, "name": "lightning_channel"}],
-                        "annotations": [
-                            {"id": 1, "image_id": 1, "category_id": 1, "bbox": [9, 0, 2, 2]}
-                        ],
-                    }
-                )
-            )
-            with self.assertRaisesRegex(ValueError, "outside image"):
-                validate_coco_dataset(annotations, root)
-
 
 if __name__ == "__main__":
     unittest.main()

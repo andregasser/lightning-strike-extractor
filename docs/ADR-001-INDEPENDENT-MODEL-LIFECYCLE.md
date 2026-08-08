@@ -4,10 +4,10 @@ Status: accepted, 2026-08-08
 
 ## Decision
 
-Detector development is an independent project below `model-development/` with
-its own package metadata, dependencies, lockfile, commands, and tests. It must
-not import `lightning_extractor`. Its inputs are versioned JSON and verified
-COCO files. Therefore the product CLI may provide useful source data but is not
+Detector development is an independent repository with its own package
+metadata, dependencies, lockfile, commands, and tests. It must not import
+`lightning_extractor`. Its inputs are versioned frame exports and annotation
+artifacts. Therefore the product CLI may provide useful source data but is not
 required to build, train, evaluate, or export a model.
 
 The product executes only a closed-set ONNX detector. It does not contain
@@ -19,7 +19,7 @@ names, class schema, thresholds, provenance, and runtime compatibility.
 ## Dependency rule
 
 ```text
-verified COCO -> model lab -> ONNX release -> product runtime
+frame export -> model lab -> ONNX release -> product runtime
                          no Python imports across either boundary
 ```
 

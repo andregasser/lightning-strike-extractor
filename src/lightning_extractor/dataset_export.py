@@ -211,7 +211,7 @@ def _write_run_frames(
         filename = f"{run.name}_frame_{frame_number:012d}.jpg"
         image_path = image_dir / filename
         if not cv2.imwrite(str(image_path), frame, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]):
-            raise RuntimeError(f"Could not write training frame: {image_path}")
+            raise RuntimeError(f"Could not write handoff frame: {image_path}")
         seen_frames.add((source_id, frame_number))
         provenance = by_frame[frame_number]
         rows.append(
@@ -246,7 +246,7 @@ def _write_run_frames(
     }
 
 
-def export_training_frames(
+def export_frame_handoff(
     runs_root: Path,
     output: Path,
     *,
@@ -304,14 +304,14 @@ def export_training_frames(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Export diverse training frames from analysis runs")
+    parser = argparse.ArgumentParser(description="Export selected frames and provenance from analysis runs")
     parser.add_argument("runs", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--max-events-per-video", type=int, default=100)
     parser.add_argument("--context-frames", type=int, default=2)
     parser.add_argument("--jpeg-quality", type=int, default=95)
     args = parser.parse_args(argv)
-    manifest = export_training_frames(
+    manifest = export_frame_handoff(
         args.runs,
         args.output,
         max_events_per_video=args.max_events_per_video,

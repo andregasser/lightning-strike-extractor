@@ -15,13 +15,10 @@ exports reviewable stills and machine-readable results.
   `lightning` through `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
 - Tests live in `tests/` and use the standard-library `unittest` runner.
-- Detector training is a separate project below `model-development/`. It has
-  its own package, lockfile, commands, tests, and dependencies and must never
-  import `lightning_extractor`. The product consumes only released ONNX model
-  bundles through the versioned manifest contract.
-- Files below `tools/model_development/` are transitional data-exchange and
-  annotation compatibility tools. Do not add training or product-runtime
-  imports there; new model lifecycle behavior belongs in `model-development/`.
+- Detector training lives in a separate repository, alongside this checkout.
+  It has its own package, lockfile, commands, tests, and dependencies and must
+  never import `lightning_extractor`. The product consumes only released ONNX
+  model bundles through the versioned manifest contract.
 - Original research scripts live in `legacy/prototypes/`. Preserve them as
   reference material unless a task explicitly asks to migrate or remove them;
   new production behavior must not be added there.
@@ -53,8 +50,6 @@ Preferred setup and checks:
 uv sync --extra dev
 uv run python -m unittest discover -s tests -v
 uv run ruff check .
-uv run --project model-development pytest
-uv run --project model-development ruff check .
 ```
 
 Useful CLI smoke test against a short known section of the local reference

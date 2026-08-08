@@ -24,8 +24,8 @@ exports full-resolution stills alongside JSON and CSV results.
 
 The repository also contains an optional, fixed-contract ONNX detector runtime.
 Dataset releases, model training, evaluation, and ONNX export live in the
-independent `model-development/` project with their own dependencies and
-lockfile. The product CLI is not installed or imported during model training.
+independent `lightning-strike-model-lab` repository with their own dependencies
+and lockfile. The product CLI is not installed or imported during model training.
 
 Built for demanding footage such as **4K, 100 fps HEVC recordings**—without
 uploading the video or modifying the source file.
@@ -269,158 +269,24 @@ production model is bundled. Detector invocation therefore reports a clear
 missing-artifact error until an evaluated ONNX release has deliberately been
 promoted. See `docs/ADR-001-INDEPENDENT-MODEL-LIFECYCLE.md` for the boundary.
 
-## Building the training dataset
+## Dataset handoff
 
-For the current implementation status and the remaining work, see
-[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). Label Studio is the active
-annotation workflow; CVAT helpers are retained only for legacy compatibility.
-
-Fine-tuning data uses standard COCO detection JSON. Each visible channel is one
-`lightning_channel` bounding box in `[x, y, width, height]` format. Images with no annotations are
-intentional negative examples.
-
-Run export and annotation compatibility helpers currently live below
-`tools/model_development/`. They exchange files with the model pipeline and do
-not import the product runtime. Actual release construction, training,
-evaluation, and ONNX export live in the standalone `model-development/`
-project; see its README for the complete commands.
-
-Create an atomic manual-annotation dataset from analysis runs:
+The CLI does not build training datasets or know annotation formats. It exports
+selected frames and neutral provenance from completed runs:
 
 ```bash
-uv run python -m tools.model_development.prepare_training_dataset runs \
-  --output dataset
+uv run python -m lightning_extractor.dataset_export runs \
+  --output frame-export
 ```
 
-This produces `manifest.json`, exported images, an initially empty COCO
-annotation file, a validated `preparation.json` summary, and a ready-to-upload
-`cvat/import.zip`. It deliberately loads no product or research model; boxes
-are drawn by the human reviewer. The output directory is published only after
-every step succeeds.
+The resulting directory contains images and a versioned `manifest.json` with
+source IDs, frame numbers, timestamps, candidate metrics and checksums. It is a
+data handoff only; no training framework or annotation schema is part of the
+CLI repository.
 
-In CVAT, create a project or task by importing `cvat/import.zip` as `COCO 1.0`. Review every
-`lightning_channel` box, delete false proposals, add missing channels, and leave true negative
-images without a box. Export the corrected task again as `COCO 1.0` with images, then validate the
-exported archive before training:
-
-```bash
-unzip corrected-coco.zip -d corrected-coco
-uv run python -m tools.model_development.validate_coco \
-  corrected-coco/annotations/instances_default.json \
-  --images corrected-coco/images/default
-```
-
-CVAT may choose a subset name other than `default`; in that case use the corresponding
-`instances_<subset>.json` and `images/<subset>` paths. Never train directly from the unverified
-proposal file.
-
-After that validation, import the manually corrected archive and create deterministic,
-source-grouped splits:
-
-```bash
-uv run python -m tools.model_development.import_cvat_dataset \
-  corrected-coco.zip \
-  --output verified-dataset
-```
-
-The importer requires exactly one COCO instances subset and the `lightning_channel` category. It
-recovers each source ID from the CVAT filename, rejects missing or ambiguous source identity, marks
-the corrected annotations as verified, and atomically writes:
-
-```text
-verified-dataset/
-├── manifest.json
-├── annotations/
-│   ├── instances_train.json
-│   ├── instances_validation.json
-│   └── instances_test.json
-└── images/
-    ├── train/
-    ├── validation/
-    └── test/
-```
-
-Default ratios are 70% training, 20% validation, and 10% test by image count. Whole source videos
-are assigned to one split, so the exact ratios are approximate—especially with only a few source
-videos. Override them with `--train-ratio`, `--validation-ratio`, and `--test-ratio`; the three
-values must sum to `1.0`. Only run this command after completing the manual CVAT review because all
-imported annotations are treated as verified.
-
-Export event peaks and nearby context frames from completed analysis runs:
-
-```bash
-uv run python -m tools.model_development.export_training_frames runs \
-  --output dataset
-```
-
-The exporter processes each source sequentially, keeps at most 100 event winners per video by
-default, includes two adjacent frames on either side, deduplicates repeated absolute frames across
-analysis runs, and records source IDs, candidate metrics, review labels, roles, and SHA-256 image
-checksums in `dataset/manifest.json`. The generated `dataset/` directory is ignored by Git.
-
-Create blank COCO tasks from a recursively scanned image root:
-
-```bash
-uv run python -m tools.model_development.preannotate_coco \
-  dataset/images --output dataset/annotations/proposals.json
-```
-
-Put each source video below its own first-level directory, for example
-`dataset/images/storm-a/frame-001.jpg`. The file records that directory as
-`source_id` and contains no model-generated boxes, keeping annotation
-preparation independent from the product runtime.
-
-Package an already prepared dataset separately when needed:
-
-```bash
-uv run python -m tools.model_development.package_cvat_dataset dataset \
-  --output dataset/cvat/import.zip
-```
-
-Label Studio is supported as an alternative review interface. Export its JSON prediction tasks,
-label configuration, and locally served image directory with:
-
-```bash
-uv run python -m tools.model_development.export_label_studio dataset \
-  --output label-studio-dataset
-```
-
-Start a local image server from another terminal:
-
-```bash
-uv run python -m tools.model_development.serve_label_studio \
-  label-studio-dataset/serve
-```
-
-Create a Label Studio project using `label-studio-dataset/project/label-config.xml`, then import
-`label-studio-dataset/import/tasks.json`. The `import/` directory deliberately contains no images;
-do not upload `serve/` through the Label Studio import dialog. The default task URLs point to
-`http://localhost:8001/images`; use `--image-base-url` when Label Studio must reach the images at a
-different HTTP or HTTPS address. Keep the image server running while labeling. Imported boxes are
-model predictions, not verified annotations, and must all be reviewed.
-
-Export completed work from Label Studio as full `JSON`—not `JSON_MIN`, COCO, or CSV—and convert the
-human annotations to verified, source-grouped COCO splits:
-
-```bash
-uv run python -m tools.model_development.import_label_studio_dataset \
-  label-studio-export.json \
-  --images dataset/images \
-  --output verified-dataset
-```
-
-The importer requires exactly one completed, non-cancelled annotation per task. An empty human
-annotation is preserved as a verified negative image; model predictions stored alongside it are
-never promoted to ground truth. Rectangle percentages are converted back to pixel coordinates and
-validated against the original image dimensions before the atomic split output is published.
-
-Keep frames from the same source video in one split. Randomly distributing adjacent frames across
-training, validation, and test sets would produce misleadingly strong evaluation results. The
-source ID is preserved in the CVAT and Label Studio handoffs for this purpose.
-
-The verified COCO dataset is the file boundary to the independent model project.
-Continue with `lightning-model release`, `train`, `evaluate`, and `export-onnx`
-as documented in [`model-development/README.md`](model-development/README.md).
+Dataset annotation, release construction, training, evaluation and ONNX export
+are maintained in the separate `lightning-strike-model-lab` repository. That
+repository converts this handoff into its own annotation and training formats.
 
 ## Batch manifests
 
@@ -727,28 +593,24 @@ uv sync --extra dev
 uv run python -m unittest discover -s tests -v
 uv run ruff check .
 
-uv run --project model-development pytest
-uv run --project model-development ruff check .
 ```
 
-Production code lives in [`src/lightning_extractor`](src/lightning_extractor),
-the independent model project in [`model-development`](model-development),
-transitional data-exchange helpers in
-[`tools/model_development`](tools/model_development), and the original research
-scripts in [`legacy/prototypes`](legacy/prototypes).
+Production code lives in [`src/lightning_extractor`](src/lightning_extractor)
+and the original research scripts in [`legacy/prototypes`](legacy/prototypes).
+The independent model project is maintained in the separate
+`lightning-strike-model-lab` repository.
 Project conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 Generated data stays out of the source tree: current analyses use ignored
-`runs/`, training exports use ignored `dataset/`, and historical local results
+`runs/`, frame handoffs use ignored `frame-export/`, and historical local results
 are consolidated below ignored `artifacts/archive/`. The archive is local and
 reversible; it is not part of the repository or production source code.
 
 ## Roadmap
 
 The public, continuously maintained roadmap lives in [`TODO.md`](TODO.md).
-Current priorities are full-length validation on real footage, completing the
-Label Studio annotation campaign, building the first immutable dataset release,
-measuring the closed-set detector, and promoting a validated ONNX bundle.
+Current priorities are full-length validation on real footage and promoting a
+validated ONNX bundle from the separate model-lab repository.
 
 ## Contributing
 
