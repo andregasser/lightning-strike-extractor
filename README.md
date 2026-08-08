@@ -24,7 +24,7 @@ exports full-resolution stills alongside JSON and CSV results.
 
 The repository also contains an optional, fixed-configuration object-detector
 runtime and offline tools for exporting candidate frames, generating COCO box
-proposals, and handing annotation work to CVAT. The currently pinned detector
+proposals, and handing annotation work to Label Studio. The currently pinned detector
 checkpoint is a bootstrap model for dataset creation, not yet the final
 lightning-trained DINO model.
 
@@ -275,6 +275,10 @@ The bootstrap detector is suitable for annotation proposals only. Its boxes are 
 and its detections must not be treated as validated product results.
 
 ## Building the training dataset
+
+For the current implementation status and the remaining work, see
+[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). Label Studio is the active
+annotation workflow; CVAT helpers are retained only for legacy compatibility.
 
 Fine-tuning data uses standard COCO detection JSON. Each visible channel is one
 `lightning_channel` bounding box in `[x, y, width, height]` format. Images with no annotations are
