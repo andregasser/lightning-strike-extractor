@@ -11,7 +11,7 @@ testing reveals new priorities.
 - [x] Run a five-minute calibration batch across the current footage set.
 - [ ] Complete full-length analysis of the current reference footage.
 - [ ] Review false positives caused by camera movement and exposure changes.
-- [ ] Create small labeled positive and negative video fixtures.
+- [x] Create small labeled positive and negative video fixtures.
 - [ ] Measure event recall and top-N candidate precision.
 - [ ] Add camera- and scenario-specific configuration profiles.
 
@@ -55,3 +55,13 @@ testing reveals new priorities.
 - [ ] Support installation through `uv tool install` and `pipx`.
 - [ ] Evaluate publishing stable releases to PyPI.
 
+## Detector lifecycle
+
+- [x] Separate model development from the product Python package.
+- [x] Replace the product PyTorch/Transformers runtime with ONNX Runtime.
+- [x] Add immutable verified dataset releases with conflict detection.
+- [x] Add independent baseline training and evaluation commands.
+- [x] Add ONNX graph validation and PyTorch parity checks.
+- [ ] Build and review the first real verified dataset release.
+- [ ] Measure detector recall and precision on labeled reference footage.
+- [ ] Promote the first evaluated production ONNX bundle.

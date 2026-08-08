@@ -1,13 +1,32 @@
 {
-  "name": "lightning-channel-detector-bootstrap",
-  "version": "0.1.0",
-  "release_status": "bootstrap",
-  "backend": "grounding_dino",
-  "artifact": "IDEA-Research/grounding-dino-tiny",
-  "revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+  "schema_version": 1,
+  "name": "lightning-channel-detector",
+  "version": "0.0.0-unreleased",
+  "release_status": "unreleased",
+  "backend": "onnx",
+  "artifact": "models/lightning-channel-detector.onnx",
   "artifact_sha256": null,
-  "class_name": "lightning_channel",
-  "prompt": "a visible lightning bolt. a forked lightning channel.",
+  "classes": ["lightning_channel"],
+  "input_name": "images",
+  "preprocessing": {
+    "width": 640,
+    "height": 640,
+    "color_order": "RGB",
+    "layout": "NCHW",
+    "scale": 0.00392156862745098,
+    "mean": [0.0, 0.0, 0.0],
+    "std": [1.0, 1.0, 1.0],
+    "resize_mode": "letterbox"
+  },
+  "outputs": {
+    "boxes": "boxes",
+    "scores": "scores",
+    "class_ids": "class_ids",
+    "box_format": "xyxy"
+  },
   "confidence_threshold": 0.25,
-  "text_threshold": 0.25
+  "nms_threshold": 0.5,
+  "onnx_opset": 17,
+  "minimum_onnxruntime_version": "1.20",
+  "dataset_release": null
 }

@@ -2,10 +2,46 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, Protocol
 
-from lightning_extractor.detector import LightningDetector
+import cv2
+
+
+class ProposalDetector(Protocol):
+    manifest: Any
+
+    def detect(self, image: Path) -> Any: ...
+
+
+@dataclass(frozen=True)
+class BlankManifest:
+    version: str = "none"
+
+    def public_metadata(self) -> dict[str, object]:
+        return {"name": "manual-annotation", "version": self.version, "backend": "none"}
+
+
+@dataclass(frozen=True)
+class BlankResult:
+    width: int
+    height: int
+    detections: tuple[()] = ()
+
+
+class BlankProposalDetector:
+    """Create empty tasks for annotation without a product or bootstrap model."""
+
+    manifest = BlankManifest()
+
+    def detect(self, image: Path) -> BlankResult:
+        pixels = cv2.imread(str(image), cv2.IMREAD_COLOR)
+        if pixels is None:
+            raise ValueError(f"Image cannot be decoded: {image}")
+        height, width = pixels.shape[:2]
+        return BlankResult(width, height)
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -25,13 +61,13 @@ def source_id(root: Path, image: Path) -> str:
     return relative.parts[0] if len(relative.parts) > 1 else image.stem
 
 
-def preannotate(root: Path, output: Path, *, detector: LightningDetector | None = None) -> dict:
+def preannotate(root: Path, output: Path, *, detector: ProposalDetector | None = None) -> dict:
     if output.exists():
         raise ValueError(f"Refusing to overwrite existing annotations: {output}")
     images = discover_images(root)
     if not images:
         raise ValueError(f"No supported images found below: {root}")
-    session = detector or LightningDetector()
+    session = detector or BlankProposalDetector()
     coco_images: list[dict[str, object]] = []
     annotations: list[dict[str, object]] = []
     annotation_id = 1

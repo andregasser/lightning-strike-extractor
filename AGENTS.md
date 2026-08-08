@@ -15,6 +15,13 @@ exports reviewable stills and machine-readable results.
   `lightning` through `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
 - Tests live in `tests/` and use the standard-library `unittest` runner.
+- Detector training is a separate project below `model-development/`. It has
+  its own package, lockfile, commands, tests, and dependencies and must never
+  import `lightning_extractor`. The product consumes only released ONNX model
+  bundles through the versioned manifest contract.
+- Files below `tools/model_development/` are transitional data-exchange and
+  annotation compatibility tools. Do not add training or product-runtime
+  imports there; new model lifecycle behavior belongs in `model-development/`.
 - Original research scripts live in `legacy/prototypes/`. Preserve them as
   reference material unless a task explicitly asks to migrate or remove them;
   new production behavior must not be added there.
@@ -46,6 +53,8 @@ Preferred setup and checks:
 uv sync --extra dev
 uv run python -m unittest discover -s tests -v
 uv run ruff check .
+uv run --project model-development pytest
+uv run --project model-development ruff check .
 ```
 
 Useful CLI smoke test against a short known section of the local reference
@@ -77,6 +86,13 @@ around `262.24s` is a useful ranking regression reference.
 
 ## Quality and documentation
 
+- Record every fundamental architecture decision in a dedicated Architecture
+  Decision Record (ADR) below `docs/`. This includes new or changed system
+  boundaries, dependency directions, runtime or model backends, persistent data
+  contracts, deployment strategies, and other decisions that materially shape
+  future implementation choices. Each ADR must state its status, context,
+  decision, consequences, and relevant alternatives; update or supersede an ADR
+  explicitly instead of silently contradicting it in code or documentation.
 - The project must be well supported by automated tests. Add or update focused
   tests whenever behavior changes, a bug is fixed, or a new edge case is
   discovered.

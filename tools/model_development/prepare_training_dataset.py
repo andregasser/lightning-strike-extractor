@@ -6,11 +6,11 @@ import os
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from lightning_extractor.detector import LightningDetector
 from tools.model_development.export_training_frames import export_training_frames
 from tools.model_development.package_cvat_dataset import package_cvat_dataset
-from tools.model_development.preannotate_coco import preannotate
+from tools.model_development.preannotate_coco import BlankProposalDetector, preannotate
 from tools.model_development.validate_coco import validate_coco_dataset
 
 
@@ -21,7 +21,7 @@ def prepare_training_dataset(
     max_events_per_video: int = 100,
     context_frames: int = 2,
     jpeg_quality: int = 95,
-    detector: LightningDetector | None = None,
+    detector: Any | None = None,
 ) -> dict:
     """Export frames, propose COCO boxes, and validate one atomic dataset."""
     output = output.resolve()
@@ -30,7 +30,7 @@ def prepare_training_dataset(
 
     # Load the fixed detector before extracting frames so missing model dependencies
     # or artifacts fail without doing potentially expensive video work.
-    session = detector or LightningDetector()
+    session = detector or BlankProposalDetector()
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as temporary:
         staged = Path(temporary) / output.name

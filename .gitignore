@@ -13,6 +13,10 @@ data/inbox/*
 /runs-*/
 /calibration-runs*/
 /dataset/
+/model-development/.venv/
+/model-development/releases/
+/model-development/experiments/
+/model-development/.pytest_cache/
 # Historical locations retained so generated data cannot drift back into root.
 analysis/
 output/

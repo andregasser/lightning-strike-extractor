@@ -10,8 +10,11 @@ are local and are not part of Git.
 
 - The production detector can inspect and analyze local videos and writes
   isolated, reproducible results below `runs/`.
-- The pinned Grounding-DINO checkpoint is a bootstrap model for annotation
-  proposals. It is not a lightning-trained production detector.
+- The product detector runtime now accepts only the versioned closed-set ONNX
+  contract. PyTorch, Transformers, Grounding DINO, prompts, and tokenizers are
+  absent from the product environment.
+- No production ONNX artifact is committed yet. Detector invocation fails
+  explicitly until an evaluated model release is promoted into the package.
 - The dataset preparation path extracts event frames and creates unverified
   COCO box proposals.
 - Label Studio is the supported review interface. The exporter creates tasks,
@@ -22,45 +25,42 @@ are local and are not part of Git.
   source-grouped COCO train/validation/test splits.
 - CVAT is legacy compatibility code only. New workflow and documentation
   should use Label Studio; do not add new CVAT features.
-- Model training and the immutable dataset-release builder are not implemented
-  yet. The current pipeline ends at `verified-dataset/`.
+- The independent `model-development/` project implements immutable dataset
+  releases, a baseline Faster R-CNN training path, validation/test evaluation,
+  and ONNX export with graph and PyTorch parity checks.
+- Training has its own package and lockfile and contains no import of
+  `lightning_extractor`. Its only product-facing output is an ONNX release
+  bundle with manifest and checksums.
 
 ## End-to-end workflow
 
 ```text
 raw video
   -> lightning analyze --output runs
-  -> prepare_training_dataset runs --output dataset
+  -> prepare_training_dataset runs --output dataset (blank human-annotation tasks)
   -> export_label_studio dataset --output label-studio-dataset
   -> review every task in Label Studio
   -> export full Label Studio JSON
   -> import_label_studio_dataset ... --output verified-dataset
-  -> (future) register campaign and build immutable dataset release
-  -> (future) train and evaluate the lightning detector
+  -> lightning-model release
+  -> lightning-model train
+  -> lightning-model evaluate
+  -> lightning-model export-onnx
+  -> deliberately promote the evaluated ONNX bundle to the product
 ```
 `runs/` is analysis evidence, not a training dataset. `dataset/` contains
-copied frames and model guesses and is not trustworthy until reviewed.
+copied frames and unreviewed annotation tasks and is not trustworthy until reviewed.
 `verified-dataset/` contains human-corrected annotations and deterministic
-source-grouped splits. A future release builder should copy this verified
-input into an immutable, hashed release and never train directly from `runs/`
-or unverified proposals.
+source-grouped splits. The independent release builder copies this verified
+input into an immutable, hashed release; training must never read directly
+from `runs/` or unverified proposals.
 
 ## Recommended next task
 
-Implement the dataset release builder as a small, deterministic CLI. It should:
-
-1. register one or more verified Label Studio campaigns with metadata and
-   checksums;
-2. merge selected campaigns while deduplicating identical image hashes;
-3. reject conflicting annotations instead of silently choosing one;
-4. assign complete source videos to train/validation/test (never split nearby
-   frames from one source across partitions);
-5. write an immutable release manifest containing tool version, input hashes,
-   category schema, split ratios, and output checksums.
-
-After that, add the training/evaluation command and measure recall and top-N
-precision on labeled reference footage. Do not pin a final detector checkpoint
-before those measurements exist.
+Create and review the first real verified dataset release, then run the new
+baseline training and evaluation commands. The code path is present, but no
+model should be promoted until recall and precision have been measured on
+labeled footage and the candidate ONNX bundle has passed parity checks.
 
 ## Known operational issue
 
@@ -77,4 +77,6 @@ Run the standard checks before handing off changes:
 ```bash
 uv run python -m unittest discover -s tests -v
 uv run ruff check .
+uv run --project model-development pytest
+uv run --project model-development ruff check .
 ```

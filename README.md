@@ -22,11 +22,10 @@ detecting sudden lightning flashes, and ranking the frames most likely to show
 a thin, visible lightning channel. It reads the original video in place and
 exports full-resolution stills alongside JSON and CSV results.
 
-The repository also contains an optional, fixed-configuration object-detector
-runtime and offline tools for exporting candidate frames, generating COCO box
-proposals, and handing annotation work to Label Studio. The currently pinned detector
-checkpoint is a bootstrap model for dataset creation, not yet the final
-lightning-trained DINO model.
+The repository also contains an optional, fixed-contract ONNX detector runtime.
+Dataset releases, model training, evaluation, and ONNX export live in the
+independent `model-development/` project with their own dependencies and
+lockfile. The product CLI is not installed or imported during model training.
 
 Built for demanding footage such as **4K, 100 fps HEVC recordings**—without
 uploading the video or modifying the source file.
@@ -244,7 +243,7 @@ to choose another label file, or `--no-open` when preview paths should only be
 printed. Review data and previews live below ignored run directories and are
 never committed automatically.
 
-## Fixed object-detector runtime
+## ONNX object-detector runtime
 
 Install the optional detector dependencies without changing the lightweight core installation:
 
@@ -260,19 +259,15 @@ uv run lightning detector detect frame.jpg \
   --preview detections.jpg
 ```
 
-The runtime model, revision, class and validated confidence threshold are fixed by
-`src/lightning_extractor/model_manifest.json`. They are included in every JSON result. The product
-CLI intentionally provides no model, prompt, device, training or threshold controls, so the same
-release produces reproducible results.
+The model artifact, checksum, preprocessing, tensor names, class schema, thresholds,
+dataset provenance, and ONNX compatibility are fixed by
+`src/lightning_extractor/model_manifest.json`. The CLI contains no PyTorch,
+Transformers, training, prompt, tokenizer, or implicit model-download path.
 
-The current `0.1.0` manifest is explicitly marked `bootstrap`: it pins the Apache-2.0-licensed
-`IDEA-Research/grounding-dino-tiny` checkpoint for integration work, but it is not the final
-lightning-trained model. A production manifest will replace it only after the dedicated detector
-has passed the reference-video evaluation. The first detector invocation downloads the pinned
-checkpoint from Hugging Face; subsequent runs use the local model cache.
-
-The bootstrap detector is suitable for annotation proposals only. Its boxes are not ground truth,
-and its detections must not be treated as validated product results.
+The checked-in manifest is currently marked `unreleased`, and no pretend
+production model is bundled. Detector invocation therefore reports a clear
+missing-artifact error until an evaluated ONNX release has deliberately been
+promoted. See `docs/ADR-001-INDEPENDENT-MODEL-LIFECYCLE.md` for the boundary.
 
 ## Building the training dataset
 
@@ -284,19 +279,24 @@ Fine-tuning data uses standard COCO detection JSON. Each visible channel is one
 `lightning_channel` bounding box in `[x, y, width, height]` format. Images with no annotations are
 intentional negative examples.
 
-Annotation, validation and training helpers live below `tools/model_development/`; they are not
-part of the installed `lightning` CLI or runtime contract.
+Run export and annotation compatibility helpers currently live below
+`tools/model_development/`. They exchange files with the model pipeline and do
+not import the product runtime. Actual release construction, training,
+evaluation, and ONNX export live in the standalone `model-development/`
+project; see its README for the complete commands.
 
-Run the complete atomic preparation workflow with the fixed proposal model:
+Create an atomic manual-annotation dataset from analysis runs:
 
 ```bash
 uv run python -m tools.model_development.prepare_training_dataset runs \
   --output dataset
 ```
 
-This produces `manifest.json`, exported images, unverified COCO proposals in
-`annotations/proposals.json`, a validated `preparation.json` summary, and the ready-to-upload
-`cvat/import.zip`. The output directory is published only after every step succeeds.
+This produces `manifest.json`, exported images, an initially empty COCO
+annotation file, a validated `preparation.json` summary, and a ready-to-upload
+`cvat/import.zip`. It deliberately loads no product or research model; boxes
+are drawn by the human reviewer. The output directory is published only after
+every step succeeds.
 
 In CVAT, create a project or task by importing `cvat/import.zip` as `COCO 1.0`. Review every
 `lightning_channel` box, delete false proposals, add missing channels, and leave true negative
@@ -358,7 +358,7 @@ default, includes two adjacent frames on either side, deduplicates repeated abso
 analysis runs, and records source IDs, candidate metrics, review labels, roles, and SHA-256 image
 checksums in `dataset/manifest.json`. The generated `dataset/` directory is ignored by Git.
 
-Create an initial COCO file of unverified box proposals from a recursively scanned image root:
+Create blank COCO tasks from a recursively scanned image root:
 
 ```bash
 uv run python -m tools.model_development.preannotate_coco \
@@ -366,9 +366,9 @@ uv run python -m tools.model_development.preannotate_coco \
 ```
 
 Put each source video below its own first-level directory, for example
-`dataset/images/storm-a/frame-001.jpg`. The proposal file records that directory as `source_id` and
-marks every generated annotation as `verified: false`; proposals must be manually corrected before
-they become training labels.
+`dataset/images/storm-a/frame-001.jpg`. The file records that directory as
+`source_id` and contains no model-generated boxes, keeping annotation
+preparation independent from the product runtime.
 
 Package an already prepared dataset separately when needed:
 
@@ -418,8 +418,9 @@ Keep frames from the same source video in one split. Randomly distributing adjac
 training, validation, and test sets would produce misleadingly strong evaluation results. The
 source ID is preserved in the CVAT and Label Studio handoffs for this purpose.
 
-Training is not implemented yet. The current development pipeline ends with a manually corrected,
-validated, and source-grouped COCO dataset.
+The verified COCO dataset is the file boundary to the independent model project.
+Continue with `lightning-model release`, `train`, `evaluate`, and `export-onnx`
+as documented in [`model-development/README.md`](model-development/README.md).
 
 ## Batch manifests
 
@@ -725,11 +726,16 @@ ffprobe and OpenCV decoding, and adding a regression fixture.
 uv sync --extra dev
 uv run python -m unittest discover -s tests -v
 uv run ruff check .
+
+uv run --project model-development pytest
+uv run --project model-development ruff check .
 ```
 
 Production code lives in [`src/lightning_extractor`](src/lightning_extractor),
-model-development utilities in [`tools/model_development`](tools/model_development),
-and the original research scripts in [`legacy/prototypes`](legacy/prototypes).
+the independent model project in [`model-development`](model-development),
+transitional data-exchange helpers in
+[`tools/model_development`](tools/model_development), and the original research
+scripts in [`legacy/prototypes`](legacy/prototypes).
 Project conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 Generated data stays out of the source tree: current analyses use ignored
@@ -740,9 +746,9 @@ reversible; it is not part of the repository or production source code.
 ## Roadmap
 
 The public, continuously maintained roadmap lives in [`TODO.md`](TODO.md).
-Current priorities are full-length validation on real footage, an interactive
-annotation pass in CVAT, source-grouped dataset splits, DINO training and evaluation, and replacing
-the bootstrap manifest with a validated production checkpoint.
+Current priorities are full-length validation on real footage, completing the
+Label Studio annotation campaign, building the first immutable dataset release,
+measuring the closed-set detector, and promoting a validated ONNX bundle.
 
 ## Contributing
 

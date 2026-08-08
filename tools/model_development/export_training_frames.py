@@ -12,7 +12,27 @@ from pathlib import Path
 
 import cv2
 
-from lightning_extractor.models import CandidateFrame
+
+@dataclass(frozen=True, slots=True)
+class CandidateFrame:
+    rank: int
+    event_id: str
+    frame_number: int
+    time: float
+    geometry_score: float
+    line_segments: int
+    bright_area: float
+    channel_length: float = 0.0
+    channel_strength: float = 0.0
+    channel_luminance: float = 0.0
+    branch_points: int = 0
+    channel_thickness: float = 0.0
+    frame_quality: float = 0.0
+    multiframe_support: float = 0.0
+    multiframe_quality: float = 0.0
+    peak_multiframe_support: float = 0.0
+    channel_template_frame_number: int = -1
+    background_frame_number: int = -1
 
 
 @dataclass(frozen=True, slots=True)
