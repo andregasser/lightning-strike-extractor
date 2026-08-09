@@ -80,7 +80,7 @@ uv sync --extra dev
 ### Inspect a video
 
 ```bash
-uv run lightning inspect /path/to/storm.mp4
+uv run lse inspect /path/to/storm.mp4
 ```
 
 Example metadata:
@@ -101,14 +101,14 @@ Example metadata:
 ### Analyze it
 
 ```bash
-uv run lightning analyze /path/to/storm.mp4 \
+uv run lse analyze /path/to/storm.mp4 \
   --config config/default.toml
 ```
 
 The same command scales to any number of files and directories:
 
 ```bash
-uv run lightning analyze \
+uv run lse analyze \
   /Volumes/Storms/camera-a.mp4 \
   /Volumes/Storms/camera-b.mov \
   /Volumes/Storms/archive \
@@ -118,7 +118,7 @@ uv run lightning analyze \
 Inspect discovery without decoding video:
 
 ```bash
-uv run lightning analyze /Volumes/Storms \
+uv run lse analyze /Volumes/Storms \
   --recursive \
   --include "*.mp4" \
   --exclude "*preview*" \
@@ -128,7 +128,7 @@ uv run lightning analyze /Volumes/Storms \
 Use a short range while tuning thresholds:
 
 ```bash
-uv run lightning analyze /path/to/storm.mp4 \
+uv run lse analyze /path/to/storm.mp4 \
   --start 250 \
   --end 270 \
   --top 10
@@ -138,7 +138,7 @@ Long runs write regular checkpoints. If a run is interrupted, continue the
 exact same source, range, and configuration with `--resume`:
 
 ```bash
-uv run lightning analyze /path/to/storm.mp4 \
+uv run lse analyze /path/to/storm.mp4 \
   --config config/default.toml \
   --resume
 ```
@@ -151,7 +151,7 @@ Videos run sequentially by default, which is safest for large HEVC sources on
 one disk. Controlled concurrency is available when the hardware can support it:
 
 ```bash
-uv run lightning analyze /Volumes/Storms \
+uv run lse analyze /Volumes/Storms \
   --recursive \
   --jobs 2 \
   --resume
@@ -212,9 +212,9 @@ legacy generated artifacts are excluded from Git.
 Inspect accumulated state at any time:
 
 ```bash
-uv run lightning runs list
-uv run lightning runs list --status failed
-uv run lightning runs show runs/batches/batch-248f7728284d
+uv run lse runs list
+uv run lse runs list --status failed
+uv run lse runs show runs/batches/batch-248f7728284d
 ```
 
 ## Manual verification
@@ -222,14 +222,14 @@ uv run lightning runs show runs/batches/batch-248f7728284d
 Label the currently selected channel candidates after an analysis:
 
 ```bash
-uv run lightning review runs
+uv run lse review runs
 ```
 
 Audit recall by reviewing the strongest proposed frame from every raw flash
 event, including events rejected by the export filter:
 
 ```bash
-uv run lightning review runs --scope all-events
+uv run lse review runs --scope all-events
 ```
 
 For each event, the command creates a five-frame strip from two frames before
@@ -260,7 +260,7 @@ uv sync --extra detector --extra dev
 Run the detector on an exported frame:
 
 ```bash
-uv run lightning detector detect frame.jpg \
+uv run lse detector detect frame.jpg \
   --output detections.json \
   --preview detections.jpg
 ```
@@ -299,7 +299,7 @@ repository converts this handoff into its own annotation and training formats.
 For large or repeatable collections, use a TOML manifest:
 
 ```bash
-uv run lightning analyze --manifest storm-campaign.toml
+uv run lse analyze --manifest storm-campaign.toml
 ```
 
 ```toml
@@ -553,8 +553,8 @@ performs the actual frame decoding. Run both a metadata check and a short
 analysis before committing to a long batch:
 
 ```bash
-uv run lightning inspect /path/to/video.mp4
-uv run lightning analyze /path/to/video.mp4 --start 0 --end 30
+uv run lse inspect /path/to/video.mp4
+uv run lse analyze /path/to/video.mp4 --start 0 --end 30
 ```
 
 ### Common formats not explicitly supported

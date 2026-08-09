@@ -26,7 +26,7 @@ def _add_discovery_options(parser: argparse.ArgumentParser) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="lightning", description="Extract lightning strikes from videos"
+        prog="lse", description="Extract lightning strikes from videos"
     )
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)

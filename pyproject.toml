@@ -20,7 +20,7 @@ detector = [
 ]
 
 [project.scripts]
-lightning = "lightning_extractor.cli:main"
+lse = "lightning_extractor.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lightning_extractor"]

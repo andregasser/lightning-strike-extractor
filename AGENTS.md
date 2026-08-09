@@ -69,8 +69,8 @@ Useful CLI smoke test against a short known section of the local reference
 video, when that video is available:
 
 ```bash
-uv run lightning inspect GX010422.mp4
-uv run lightning analyze GX010422.mp4 --start 260 --end 264 --top 5
+uv run lse inspect GX010422.mp4
+uv run lse analyze GX010422.mp4 --start 260 --end 264 --top 5
 ```
 
 The known event around `262.05s` should be detected; the clear channel frame
