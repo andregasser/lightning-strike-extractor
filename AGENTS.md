@@ -6,6 +6,12 @@ This repository contains a Python command-line tool that detects lightning
 events in videos, ranks frames containing visible lightning channels, and
 exports reviewable stills and machine-readable results.
 
+## Language policy
+
+All repository documentation, source code, code comments, command-line help,
+and user-facing messages must be written in English. Keep examples and
+technical terminology consistent with this policy.
+
 ## Repository split
 
 The project is maintained across two separate Git repositories:
@@ -24,8 +30,8 @@ ONNX bundles; the CLI must never be imported or installed by the training repo.
 - Production code lives in `src/lse/`.
 - Batch discovery, manifests, scheduling, and summaries live in
   `src/lse/batch.py` and `discovery.py`.
-- The CLI entry point is `lse.cli:main` and is exposed as
-  `lightning` through `pyproject.toml`.
+- The CLI entry point is `lse.cli:main` and is exposed as `lse` through
+  `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
 - Tests live in `tests/` and use the standard-library `unittest` runner.
 - Detector training lives in a separate repository, alongside this checkout.
