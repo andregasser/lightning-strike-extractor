@@ -9,7 +9,7 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from lightning_extractor.detector import (
+from lse.detector import (
     Detection,
     DetectionResult,
     LightningDetector,
@@ -86,7 +86,7 @@ class DetectorRuntimeTests(unittest.TestCase):
             model.touch()
             image = root / "frame.jpg"
             cv2.imwrite(str(image), np.zeros((100, 200, 3), dtype=np.uint8))
-            with patch("lightning_extractor.detector._runtime_import", return_value=Runtime):
+            with patch("lse.detector._runtime_import", return_value=Runtime):
                 detector = LightningDetector(model_path=model)
                 result = detector.detect(image)
             self.assertEqual(detector.session.input.shape, (1, 3, 640, 640))

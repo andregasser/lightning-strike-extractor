@@ -9,9 +9,9 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from lightning_extractor.config import Config
-from lightning_extractor.detection import detect_flashes
-from lightning_extractor.pipeline import analyze, run_identity
+from lse.config import Config
+from lse.detection import detect_flashes
+from lse.pipeline import analyze, run_identity
 
 
 def _write_test_video(path: Path, fps: float = 10.0, frames: int = 40) -> None:
@@ -93,9 +93,9 @@ class RunStateTests(unittest.TestCase):
                 "video": {"fps": 25.0},
             }
             with (
-                patch("lightning_extractor.pipeline.probe_video", return_value=source),
+                patch("lse.pipeline.probe_video", return_value=source),
                 patch(
-                    "lightning_extractor.pipeline.detect_flashes",
+                    "lse.pipeline.detect_flashes",
                     side_effect=KeyboardInterrupt,
                 ),
                 self.assertRaises(KeyboardInterrupt),

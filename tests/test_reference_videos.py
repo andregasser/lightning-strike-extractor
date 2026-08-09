@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lightning_extractor.config import Config
-from lightning_extractor.models import CandidateFrame
-from lightning_extractor.pipeline import analyze, select_export_candidates
+from lse.config import Config
+from lse.models import CandidateFrame
+from lse.pipeline import analyze, select_export_candidates
 
 FIXTURES = Path(__file__).parent / "fixtures" / "reference"
 

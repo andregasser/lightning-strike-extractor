@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from lightning_extractor.dataset_export import export_frame_handoff
+from lse.dataset_export import export_frame_handoff
 
 
 class DatasetExportTests(unittest.TestCase):

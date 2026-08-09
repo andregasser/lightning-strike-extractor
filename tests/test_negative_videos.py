@@ -7,10 +7,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from lightning_extractor.config import Config
-from lightning_extractor.detection import rank_event_frames
-from lightning_extractor.models import FlashEvent
-from lightning_extractor.pipeline import select_export_candidates
+from lse.config import Config
+from lse.detection import rank_event_frames
+from lse.models import FlashEvent
+from lse.pipeline import select_export_candidates
 
 
 def textured_frame() -> np.ndarray:

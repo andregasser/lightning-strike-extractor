@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lightning_extractor.discovery import discover_inputs
+from lse.discovery import discover_inputs
 
 
 class DiscoveryTests(unittest.TestCase):

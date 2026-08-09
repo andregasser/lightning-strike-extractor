@@ -267,7 +267,7 @@ uv run lse detector detect frame.jpg \
 
 The model artifact, checksum, preprocessing, tensor names, class schema, thresholds,
 dataset provenance, and ONNX compatibility are fixed by
-`src/lightning_extractor/model_manifest.json`. The CLI contains no PyTorch,
+`src/lse/model_manifest.json`. The CLI contains no PyTorch,
 Transformers, training, prompt, tokenizer, or implicit model-download path.
 
 The checked-in manifest is currently marked `unreleased`, and no pretend
@@ -281,7 +281,7 @@ The CLI does not build training datasets or know annotation formats. It exports
 selected frames and neutral provenance from completed runs:
 
 ```bash
-uv run python -m lightning_extractor.dataset_export runs \
+uv run python -m lse.dataset_export runs \
   --output frame-export
 ```
 
@@ -601,7 +601,7 @@ uv run ruff check .
 
 ```
 
-Production code lives in [`src/lightning_extractor`](src/lightning_extractor)
+Production code lives in [`src/lse`](src/lse)
 and the original research scripts in [`legacy/prototypes`](legacy/prototypes).
 The independent model project is maintained in the separate
 `lightning-strike-extractor-training` repository.

@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from lightning_extractor.batch import VideoJob, load_manifest, run_batch
-from lightning_extractor.config import Config
+from lse.batch import VideoJob, load_manifest, run_batch
+from lse.config import Config
 
 
 class ManifestTests(unittest.TestCase):
@@ -67,9 +67,9 @@ class BatchExecutionTests(unittest.TestCase):
                 return run
 
             with (
-                patch("lightning_extractor.batch.resolve_run_path", side_effect=fake_resolve),
+                patch("lse.batch.resolve_run_path", side_effect=fake_resolve),
                 patch(
-                    "lightning_extractor.batch.analyze", side_effect=fake_analyze
+                    "lse.batch.analyze", side_effect=fake_analyze
                 ) as analyze_mock,
             ):
                 first = run_batch(jobs, root / "runs", progress_mode="quiet", worker_count=2)
@@ -111,8 +111,8 @@ class BatchExecutionTests(unittest.TestCase):
                 return run
 
             with (
-                patch("lightning_extractor.batch.resolve_run_path", side_effect=fake_resolve),
-                patch("lightning_extractor.batch.analyze", side_effect=fake_analyze),
+                patch("lse.batch.resolve_run_path", side_effect=fake_resolve),
+                patch("lse.batch.analyze", side_effect=fake_analyze),
             ):
                 result = run_batch(
                     [VideoJob(good, Config()), VideoJob(bad, Config())],

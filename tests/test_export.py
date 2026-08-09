@@ -6,9 +6,9 @@ from tempfile import TemporaryDirectory
 
 import cv2
 
-from lightning_extractor.config import Config
-from lightning_extractor.models import CandidateFrame
-from lightning_extractor.pipeline import (
+from lse.config import Config
+from lse.models import CandidateFrame
+from lse.pipeline import (
     export_stills,
     has_visible_channel_peak,
     select_export_candidates,

@@ -8,9 +8,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from lightning_extractor.config import Config
-from lightning_extractor.models import CandidateFrame
-from lightning_extractor.review import discover_review_items, review_candidates
+from lse.config import Config
+from lse.models import CandidateFrame
+from lse.review import discover_review_items, review_candidates
 
 
 class ReviewTests(unittest.TestCase):

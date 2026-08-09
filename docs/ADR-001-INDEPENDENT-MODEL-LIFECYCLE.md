@@ -6,7 +6,7 @@ Status: accepted, 2026-08-08
 
 Detector development is an independent repository with its own package
 metadata, dependencies, lockfile, commands, and tests. It must not import
-`lightning_extractor`. Its inputs are versioned frame exports and annotation
+`lse`. Its inputs are versioned frame exports and annotation
 artifacts. Therefore the product CLI may provide useful source data but is not
 required to build, train, evaluate, or export a model.
 

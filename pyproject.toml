@@ -20,10 +20,10 @@ detector = [
 ]
 
 [project.scripts]
-lse = "lightning_extractor.cli:main"
+lse = "lse.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lightning_extractor"]
+packages = ["src/lse"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

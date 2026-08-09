@@ -7,7 +7,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from lightning_extractor.cli import main
+from lse.cli import main
 
 
 class CliTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class CliTests(unittest.TestCase):
         }
         output = StringIO()
         with (
-            patch("lightning_extractor.cli.review_candidates", return_value=(Path("labels.json"), counts)),
+            patch("lse.cli.review_candidates", return_value=(Path("labels.json"), counts)),
             redirect_stdout(output),
         ):
             exit_code = main(["review", "runs", "--no-open"])

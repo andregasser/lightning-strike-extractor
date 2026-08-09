@@ -99,7 +99,7 @@ def load_model_manifest(path: Path | None = None) -> ModelManifest:
     data = json.loads(
         path.read_text()
         if path is not None
-        else files("lightning_extractor").joinpath("model_manifest.json").read_text()
+        else files("lse").joinpath("model_manifest.json").read_text()
     )
     preprocessing_data = data.pop("preprocessing")
     preprocessing = Preprocessing(
@@ -172,7 +172,7 @@ class LightningDetector:
     def __init__(self, model_path: Path | None = None, manifest_path: Path | None = None) -> None:
         self.manifest = load_model_manifest(manifest_path)
         if model_path is None:
-            resource = files("lightning_extractor").joinpath(self.manifest.artifact)
+            resource = files("lse").joinpath(self.manifest.artifact)
             context = as_file(resource)
             self._artifact_context = context
             model_path = context.__enter__()

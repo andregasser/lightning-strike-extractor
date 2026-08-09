@@ -5,15 +5,15 @@ import unittest
 import cv2
 import numpy as np
 
-from lightning_extractor.config import Config
-from lightning_extractor.detection import (
+from lse.config import Config
+from lse.detection import (
     _apply_multiframe_peak_quality,
     _apply_multiframe_support,
     frame_channel_metrics,
     frame_geometry_score,
     percentile,
 )
-from lightning_extractor.models import CandidateFrame
+from lse.models import CandidateFrame
 
 
 def textured_scene() -> np.ndarray:

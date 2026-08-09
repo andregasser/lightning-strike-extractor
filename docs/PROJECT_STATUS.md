@@ -37,7 +37,7 @@ dataset release construction, training, evaluation, and model promotion.
 
 The CLI repository must not gain training-framework dependencies, annotation
 format implementations, dataset splitters, model checkpoints, or training
-commands. The model-lab repository must not import `lightning_extractor`.
+commands. The model-lab repository must not import `lse`.
 Communication happens through versioned files and released ONNX bundles.
 
 ## Recommended next task

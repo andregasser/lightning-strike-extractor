@@ -21,16 +21,16 @@ ONNX bundles; the CLI must never be imported or installed by the training repo.
 
 ## Architecture
 
-- Production code lives in `src/lightning_extractor/`.
+- Production code lives in `src/lse/`.
 - Batch discovery, manifests, scheduling, and summaries live in
-  `src/lightning_extractor/batch.py` and `discovery.py`.
-- The CLI entry point is `lightning_extractor.cli:main` and is exposed as
+  `src/lse/batch.py` and `discovery.py`.
+- The CLI entry point is `lse.cli:main` and is exposed as
   `lightning` through `pyproject.toml`.
 - Default analysis settings live in `config/default.toml`.
 - Tests live in `tests/` and use the standard-library `unittest` runner.
 - Detector training lives in a separate repository, alongside this checkout.
   It has its own package, lockfile, commands, tests, and dependencies and must
-  never import `lightning_extractor`. The product consumes only released ONNX
+  never import `lse`. The product consumes only released ONNX
   model bundles through the versioned manifest contract.
 - Original research scripts live in `legacy/prototypes/`. Preserve them as
   reference material unless a task explicitly asks to migrate or remove them;
