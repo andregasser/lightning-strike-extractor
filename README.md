@@ -281,7 +281,7 @@ The CLI does not build training datasets or know annotation formats. It exports
 selected frames and neutral provenance from completed runs:
 
 ```bash
-uv run python -m lse.dataset_export runs \
+uv run lse dataset-export runs \
   --output frame-export
 ```
 

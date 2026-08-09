@@ -47,6 +47,33 @@ class CliTests(unittest.TestCase):
         self.assertIn("lightning: 2", output.getvalue())
         self.assertIn("pending: 3", output.getvalue())
 
+    def test_dataset_export_command_uses_cli_subcommand(self) -> None:
+        manifest = {"sources": [{"source_video": "storm.mp4"}], "frames": [{"file_name": "frame.jpg"}]}
+        with (
+            patch("lse.cli.export_frame_handoff", return_value=manifest) as export,
+            redirect_stdout(StringIO()) as output,
+        ):
+            exit_code = main(
+                [
+                    "dataset-export",
+                    "runs",
+                    "--output",
+                    "handoffs/example",
+                    "--max-events-per-video",
+                    "25",
+                    "--context-frames",
+                    "3",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        export.assert_called_once()
+        self.assertEqual(export.call_args.args[0], Path("runs"))
+        self.assertEqual(export.call_args.args[1], Path("handoffs/example"))
+        self.assertEqual(export.call_args.kwargs["max_events_per_video"], 25)
+        self.assertEqual(export.call_args.kwargs["context_frames"], 3)
+        self.assertIn("sources: 1", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

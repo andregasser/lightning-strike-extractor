@@ -21,7 +21,7 @@ project is maintained separately in the `lightning-strike-extractor-training` re
 
 ```text
 raw video
-  -> lightning analyze
+  -> lse analyze
   -> review and select evidence
   -> neutral frame/provenance export
   -> (separate model-lab repository)

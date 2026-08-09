@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .batch import VideoJob, deduplicate_jobs, list_runs, load_manifest, run_batch
 from .config import load_config
+from .dataset_export import export_frame_handoff
 from .detector import detect_image, render_detections, write_detection_json
 from .discovery import DiscoveryResult, discover_inputs
 from .probe import ProbeError, probe_video
@@ -64,6 +65,15 @@ def _parser() -> argparse.ArgumentParser:
         choices=("auto", "interactive", "plain", "json", "quiet"),
         help="Progress output format",
     )
+
+    dataset_export = commands.add_parser(
+        "dataset-export", help="Export selected frames and provenance as a training handoff"
+    )
+    dataset_export.add_argument("runs", type=Path, help="Runs root or one video run")
+    dataset_export.add_argument("--output", required=True, type=Path)
+    dataset_export.add_argument("--max-events-per-video", type=int, default=100)
+    dataset_export.add_argument("--context-frames", type=int, default=2)
+    dataset_export.add_argument("--jpeg-quality", type=int, default=95)
 
     runs = commands.add_parser("runs", help="Inspect analysis run state")
     run_commands = runs.add_subparsers(dest="runs_command", required=True)
@@ -269,6 +279,22 @@ def _detector(args: argparse.Namespace) -> int:
     return 0
 
 
+def _dataset_export(args: argparse.Namespace) -> int:
+    manifest = export_frame_handoff(
+        args.runs,
+        args.output,
+        max_events_per_video=args.max_events_per_video,
+        context_frames=args.context_frames,
+        jpeg_quality=args.jpeg_quality,
+    )
+    print(
+        f"sources: {len(manifest['sources'])}\n"
+        f"frames: {len(manifest['frames'])}\n"
+        f"output: {args.output.resolve()}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -280,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
             return _review(args)
         if args.command == "detector":
             return _detector(args)
+        if args.command == "dataset-export":
+            return _dataset_export(args)
         return _analyze(args)
     except KeyboardInterrupt:
         print("interrupted; progress written so far can be resumed", file=sys.stderr)
