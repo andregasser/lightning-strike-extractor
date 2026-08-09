@@ -24,8 +24,14 @@ exports full-resolution stills alongside JSON and CSV results.
 
 The repository also contains an optional, fixed-contract ONNX detector runtime.
 Dataset releases, model training, evaluation, and ONNX export live in the
-independent `lightning-strike-extractor-training` repository with their own dependencies
-and lockfile. The product CLI is not installed or imported during model training.
+independent [Lightning Strike Extractor Training repository](https://github.com/andregasser/lightning-strike-extractor-training)
+with their own dependencies and lockfile. The product CLI is not installed or
+imported during model training.
+
+The two repositories are deliberately connected through a file-based handoff
+and a versioned ONNX manifest: this repository analyzes videos and exports
+provenance, while the [training repository](https://github.com/andregasser/lightning-strike-extractor-training)
+builds and releases models for this CLI to consume.
 
 Built for demanding footage such as **4K, 100 fps HEVC recordings**—without
 uploading the video or modifying the source file.
