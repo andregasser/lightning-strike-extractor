@@ -63,7 +63,7 @@ def resolve_run_path(
     video = video.resolve()
     source = source or probe_video(video)
     identity = run_identity(video, source, config, start_seconds, end_seconds)
-    return runs_root / f"{video.stem}-{_source_id(video)}-{identity}"
+    return runs_root / "videos" / f"{video.stem}-{_source_id(video)}-{identity}"
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
