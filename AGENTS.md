@@ -6,6 +6,19 @@ This repository contains a Python command-line tool that detects lightning
 events in videos, ranks frames containing visible lightning channels, and
 exports reviewable stills and machine-readable results.
 
+## Repository split
+
+The project is maintained across two separate Git repositories:
+
+- [`lightning-strike-extractor`](https://github.com/andregasser/lightning-strike-extractor)
+  contains the production CLI and video-analysis runtime.
+- [`lightning-strike-extractor-training`](https://github.com/andregasser/lightning-strike-extractor-training)
+  contains dataset preparation, training, evaluation and ONNX model releases.
+
+The repositories are independent projects with separate dependencies and
+lockfiles. They communicate only through versioned file contracts and released
+ONNX bundles; the CLI must never be imported or installed by the training repo.
+
 ## Architecture
 
 - Production code lives in `src/lightning_extractor/`.
