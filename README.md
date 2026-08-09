@@ -24,7 +24,7 @@ exports full-resolution stills alongside JSON and CSV results.
 
 The repository also contains an optional, fixed-contract ONNX detector runtime.
 Dataset releases, model training, evaluation, and ONNX export live in the
-independent `lightning-strike-model-lab` repository with their own dependencies
+independent `lightning-strike-extractor-training` repository with their own dependencies
 and lockfile. The product CLI is not installed or imported during model training.
 
 Built for demanding footage such as **4K, 100 fps HEVC recordings**—without
@@ -285,7 +285,7 @@ data handoff only; no training framework or annotation schema is part of the
 CLI repository.
 
 Dataset annotation, release construction, training, evaluation and ONNX export
-are maintained in the separate `lightning-strike-model-lab` repository. That
+are maintained in the separate `lightning-strike-extractor-training` repository. That
 repository converts this handoff into its own annotation and training formats.
 
 ## Batch manifests
@@ -598,7 +598,7 @@ uv run ruff check .
 Production code lives in [`src/lightning_extractor`](src/lightning_extractor)
 and the original research scripts in [`legacy/prototypes`](legacy/prototypes).
 The independent model project is maintained in the separate
-`lightning-strike-model-lab` repository.
+`lightning-strike-extractor-training` repository.
 Project conventions are documented in [`AGENTS.md`](AGENTS.md).
 
 Generated data stays out of the source tree: current analyses use ignored

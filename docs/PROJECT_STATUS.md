@@ -3,7 +3,7 @@
 Last updated: 2026-08-08
 
 This repository is the production video-analysis CLI. The model development
-project is maintained separately in the `lightning-strike-model-lab` repository.
+project is maintained separately in the `lightning-strike-extractor-training` repository.
 
 ## Current state
 
